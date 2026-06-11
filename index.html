@@ -7,21 +7,21 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #f7f5f0;
+    --bg: #f6f4fb;
     --surface: #ffffff;
-    --surface2: #f2f0eb;
-    --border: rgba(0,0,0,0.10);
-    --border-strong: rgba(0,0,0,0.18);
-    --text: #1a1a18;
-    --text2: #5a5a55;
-    --text3: #9a9a94;
-    --done-bg: #eaf3de;  --done-text: #27500a;  --done-border: #639922;
-    --wip-bg: #faeeda;   --wip-text: #633806;   --wip-border: #ba7517;
-    --todo-bg: #fcebeb;  --todo-text: #501313;  --todo-border: #a32d2d;
-    --accent: #d4853a;
-    --accent-light: #fdf0e2;
+    --surface2: #f3f0fa;
+    --border: rgba(76, 29, 149, 0.10);
+    --border-strong: rgba(76, 29, 149, 0.22);
+    --text: #241f35;
+    --text2: #5b5470;
+    --text3: #968fa8;
+    --done-bg: #e7f7ef;  --done-text: #065f46;  --done-border: #10b981;
+    --wip-bg: #fdf3e0;   --wip-text: #92400e;   --wip-border: #f59e0b;
+    --todo-bg: #fdebee;  --todo-text: #9f1239;  --todo-border: #f43f5e;
+    --accent: #7c3aed;
+    --accent-light: #f1e9fe;
     --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
-    --r: 10px;
+    --r: 12px;
   }
   body { background: var(--bg); font-family: var(--font); color: var(--text); min-height: 100vh; }
   button { font-family: inherit; }
@@ -51,11 +51,11 @@
   .topbar .spacer { flex: 1; }
   .user-chip { font-size: 12px; color: var(--text3); white-space: nowrap; }
 
-  .btn-primary { padding: 8px 20px; border-radius: 7px; border: none; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
-  .btn-primary:hover { background: #b8702d; }
-  .btn-cancel { padding: 8px 16px; border-radius: 7px; border: 1px solid var(--border-strong); background: transparent; color: var(--text2); font-size: 13px; cursor: pointer; }
+  .btn-primary { padding: 8px 20px; border-radius: 999px; border: none; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(124, 58, 237, 0.30); }
+  .btn-primary:hover { background: #6d28d9; }
+  .btn-cancel { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--border-strong); background: transparent; color: var(--text2); font-size: 13px; cursor: pointer; }
   .btn-cancel:hover { background: var(--surface2); }
-  .btn-danger { padding: 8px 16px; border-radius: 7px; border: 1px solid var(--todo-border); background: transparent; color: var(--todo-text); font-size: 13px; cursor: pointer; margin-right: auto; }
+  .btn-danger { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--todo-border); background: transparent; color: var(--todo-text); font-size: 13px; cursor: pointer; margin-right: auto; }
   .btn-danger:hover { background: var(--todo-bg); }
 
   /* STATS BAR */
@@ -86,7 +86,7 @@
   .filter-row select:focus, .filter-row input:focus { border-color: var(--accent); }
   .filter-group { display: flex; align-items: center; gap: 6px; }
   .filter-sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
-  .btn-reset { font-size: 12px; padding: 5px 12px; border: 1px solid var(--border-strong); border-radius: 6px; background: transparent; color: var(--text2); cursor: pointer; }
+  .btn-reset { font-size: 12px; padding: 5px 12px; border: 1px solid var(--border-strong); border-radius: 999px; background: transparent; color: var(--text2); cursor: pointer; }
   .btn-reset:hover { background: var(--surface2); }
   .filter-row .grow { flex: 1; }
 
@@ -114,7 +114,7 @@
   .dot-wip  { background: var(--wip-border); }
   .dot-todo { background: var(--todo-border); }
 
-  .assign-pill { font-size: 12px; background: #eef2fb; color: #2a4a9e; border-radius: 20px; padding: 2px 10px; font-weight: 500; white-space: nowrap; }
+  .assign-pill { font-size: 12px; background: #ede9fe; color: #5b21b6; border-radius: 20px; padding: 2px 10px; font-weight: 500; white-space: nowrap; }
   .assign-empty { font-size: 12px; color: var(--text3); }
 
   .action-btn { font-size: 11px; padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--surface2); color: var(--text2); cursor: pointer; white-space: nowrap; }
@@ -153,7 +153,7 @@
   #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 11px 20px; border-radius: 9px; font-size: 13.5px; z-index: 2000; opacity: 0; pointer-events: none; transition: opacity .25s; }
   #toast.show { opacity: 1; }
 
-  .ghost-btn { background: transparent; border: 1px solid var(--border-strong); color: var(--text2); padding: 7px 14px; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .ghost-btn { background: transparent; border: 1px solid var(--border-strong); color: var(--text2); padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
   .ghost-btn:hover { background: var(--surface2); color: var(--text); }
 
   @media (max-width: 760px) {
