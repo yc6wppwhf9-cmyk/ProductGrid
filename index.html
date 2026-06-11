@@ -197,6 +197,8 @@
     width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px;
   }
   .modal textarea { resize: vertical; min-height: 64px; }
+  .modal .form-row { display: flex; gap: 10px; }
+  .modal .form-row > div { flex: 1; min-width: 0; }
   .modal .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
 
   /* lightbox */
@@ -294,16 +296,50 @@
   <div class="modal">
     <h3 id="productModalTitle">Add product</h3>
     <form id="productForm">
-      <label>Channel</label>
-      <select id="pfChannel" required></select>
+      <div class="form-row">
+        <div>
+          <label>Channel</label>
+          <select id="pfChannel" required></select>
+        </div>
+        <div>
+          <label>Client</label>
+          <select id="pfClient"><option value="">— select client —</option></select>
+        </div>
+      </div>
       <label>Product name</label>
-      <input id="pfName" required maxlength="200" placeholder="e.g. Classic Honey 500g">
-      <label>Product range</label>
-      <input id="pfRange" maxlength="200" placeholder="e.g. Premium Range">
-      <label>SKU / product code</label>
-      <input id="pfSku" maxlength="100" placeholder="e.g. SKU-1023">
-      <label>Notes / remarks</label>
-      <textarea id="pfNotes" maxlength="2000" placeholder="Any remarks for the illustrator…"></textarea>
+      <input id="pfName" required maxlength="200" placeholder="e.g. Boys Crew Neck T-shirt">
+      <div class="form-row">
+        <div>
+          <label>Size</label>
+          <input id="pfSize" maxlength="100" placeholder="e.g. 2-8 yrs">
+        </div>
+        <div>
+          <label>Fabric</label>
+          <input id="pfFabric" maxlength="200" placeholder="e.g. 100% cotton">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>HSCVPL Target BOM</label>
+          <input id="pfBom" maxlength="100" placeholder="e.g. ₹85">
+        </div>
+        <div>
+          <label>D Mart Price Point</label>
+          <input id="pfPrice" maxlength="100" placeholder="e.g. ₹199">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>SKU / product code</label>
+          <input id="pfSku" maxlength="100" placeholder="e.g. SKU-1023">
+        </div>
+        <div>
+          <label>Assigned to</label>
+          <input id="pfAssigned" maxlength="200" placeholder="e.g. Rahul">
+        </div>
+      </div>
+      <label>Product description</label>
+      <textarea id="pfDesc" maxlength="2000" placeholder="Description / remarks for the illustrator…"></textarea>
       <div class="modal-actions">
         <button type="button" class="ghost" data-close>Cancel</button>
         <button type="submit" class="primary" id="pfSubmit">Save</button>
@@ -347,6 +383,7 @@ if (!configured) {
 const sb = configured ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 let channels = [];
+let clients = [];
 let products = [];
 let currentUser = null;
 let authMode = "login";          // 'login' | 'signup'
@@ -427,13 +464,16 @@ async function logout() {
 
 /* =================== DATA =================== */
 async function loadAll() {
-  const [chRes, prRes] = await Promise.all([
+  const [chRes, clRes, prRes] = await Promise.all([
     sb.from("channels").select("*").order("name"),
+    sb.from("clients").select("*").order("name"),
     sb.from("products").select("*").order("created_at", { ascending: true }),
   ]);
   if (chRes.error) { toast("Could not load channels: " + chRes.error.message); return; }
+  if (clRes.error) { toast("Could not load clients: " + clRes.error.message); return; }
   if (prRes.error) { toast("Could not load products: " + prRes.error.message); return; }
   channels = chRes.data;
+  clients = clRes.data;
   products = prRes.data;
   render();
 }
@@ -444,6 +484,7 @@ function subscribeRealtime() {
   rtChannel = sb.channel("grid-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadAll())
     .on("postgres_changes", { event: "*", schema: "public", table: "channels" }, () => loadAll())
+    .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, () => loadAll())
     .subscribe();
 }
 
@@ -476,7 +517,8 @@ function render() {
     let items = products.filter((p) => p.channel_id === ch.id);
     if (q) {
       items = items.filter((p) =>
-        [p.name, p.product_range, p.sku, p.notes].some((v) => (v || "").toLowerCase().includes(q)));
+        [p.name, p.client, p.size, p.target_bom, p.price_point, p.sku, p.fabric, p.description, p.assigned_to]
+          .some((v) => (v || "").toLowerCase().includes(q)));
     }
     const all = products.filter((p) => p.channel_id === ch.id);
     const counts = { red: 0, yellow: 0, green: 0 };
@@ -513,8 +555,13 @@ function cardHtml(p) {
          <div class="placeholder"><span class="ph-ic">🖼️</span><span>No illustration yet — click to upload</span></div></div>`;
 
   const metaBits = [];
-  if (p.product_range) metaBits.push(`<b>Range:</b> ${esc(p.product_range)}`);
+  if (p.client) metaBits.push(`<b>Client:</b> ${esc(p.client)}`);
+  if (p.size) metaBits.push(`<b>Size:</b> ${esc(p.size)}`);
+  if (p.target_bom) metaBits.push(`<b>Target BOM:</b> ${esc(p.target_bom)}`);
+  if (p.price_point) metaBits.push(`<b>Price point:</b> ${esc(p.price_point)}`);
   if (p.sku) metaBits.push(`<b>SKU:</b> ${esc(p.sku)}`);
+  if (p.fabric) metaBits.push(`<b>Fabric:</b> ${esc(p.fabric)}`);
+  if (p.assigned_to) metaBits.push(`<b>Assigned to:</b> ${esc(p.assigned_to)}`);
 
   return `<div class="card">
     ${thumb}
@@ -529,7 +576,7 @@ function cardHtml(p) {
         <button class="t-green ${p.status === "green" ? "lit" : ""}" title="Green = illustration uploaded" onclick="setStatus('${p.id}','green')"></button>
       </div>
     </div>
-    ${p.notes ? `<div class="card-notes">📝 ${esc(p.notes)}</div>` : ""}
+    ${p.description ? `<div class="card-notes">📝 ${esc(p.description)}</div>` : ""}
     <div class="status-label ${p.status}">● ${statusText}</div>
     <div class="card-actions">
       ${p.status === "red" ? `<button class="start-btn" onclick="setStatus('${p.id}','yellow')">▶ Start work</button>` : ""}
@@ -616,6 +663,33 @@ function openLightbox(id) {
 $("lightbox").onclick = () => $("lightbox").classList.remove("open");
 
 /* =================== PRODUCT CRUD =================== */
+function populateClientOptions(selected) {
+  const chId = $("pfChannel").value;
+  const names = clients.filter((c) => c.channel_id === chId).map((c) => c.name);
+  if (selected && !names.includes(selected)) names.unshift(selected);
+  $("pfClient").innerHTML = '<option value="">— select client —</option>' +
+    names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join("") +
+    '<option value="__new__">＋ Add new client…</option>';
+  $("pfClient").value = selected || "";
+}
+
+async function handleClientSelect() {
+  if ($("pfClient").value !== "__new__") return;
+  const chId = $("pfChannel").value;
+  const ch = channels.find((c) => c.id === chId);
+  const name = (prompt(`New client name for channel "${ch ? ch.name : ""}":`) || "").trim();
+  if (!name || !chId) { $("pfClient").value = ""; return; }
+  const { error } = await sb.from("clients").insert({ channel_id: chId, name });
+  if (error && error.code !== "23505") {
+    toast("Could not add client: " + error.message);
+    $("pfClient").value = "";
+    return;
+  }
+  const { data } = await sb.from("clients").select("*").order("name");
+  if (data) clients = data;
+  populateClientOptions(name);
+}
+
 function openProductModal(productId, channelId) {
   editingProductId = productId;
   presetChannelId = channelId || null;
@@ -623,22 +697,33 @@ function openProductModal(productId, channelId) {
   $("productModalTitle").textContent = p ? "Edit product" : "Add product";
   $("pfChannel").innerHTML = channels.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
   $("pfChannel").value = p ? p.channel_id : (presetChannelId || (channels[0] && channels[0].id) || "");
+  populateClientOptions(p ? (p.client || "") : "");
   $("pfName").value = p ? p.name : "";
-  $("pfRange").value = p ? (p.product_range || "") : "";
+  $("pfSize").value = p ? (p.size || "") : "";
+  $("pfFabric").value = p ? (p.fabric || "") : "";
+  $("pfBom").value = p ? (p.target_bom || "") : "";
+  $("pfPrice").value = p ? (p.price_point || "") : "";
   $("pfSku").value = p ? (p.sku || "") : "";
-  $("pfNotes").value = p ? (p.notes || "") : "";
+  $("pfAssigned").value = p ? (p.assigned_to || "") : "";
+  $("pfDesc").value = p ? (p.description || "") : "";
   $("productModal").classList.add("open");
   $("pfName").focus();
 }
 
 async function saveProduct(e) {
   e.preventDefault();
+  const clientVal = $("pfClient").value;
   const payload = {
     channel_id: $("pfChannel").value,
+    client: clientVal && clientVal !== "__new__" ? clientVal : null,
     name: $("pfName").value.trim(),
-    product_range: $("pfRange").value.trim() || null,
+    size: $("pfSize").value.trim() || null,
+    fabric: $("pfFabric").value.trim() || null,
+    target_bom: $("pfBom").value.trim() || null,
+    price_point: $("pfPrice").value.trim() || null,
     sku: $("pfSku").value.trim() || null,
-    notes: $("pfNotes").value.trim() || null,
+    assigned_to: $("pfAssigned").value.trim() || null,
+    description: $("pfDesc").value.trim() || null,
   };
   if (!payload.channel_id) { toast("Create a channel first"); return; }
   let error;
@@ -724,6 +809,8 @@ if (configured) {
   };
   $("productForm").onsubmit = saveProduct;
   $("channelForm").onsubmit = saveChannel;
+  $("pfChannel").onchange = () => populateClientOptions("");
+  $("pfClient").onchange = handleClientSelect;
   $("fileInput").onchange = handleFile;
   $("searchBox").oninput = render;
   $("channelFilter").onchange = render;

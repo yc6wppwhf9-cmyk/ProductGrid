@@ -11,14 +11,28 @@ create table if not exists public.channels (
   created_at timestamptz not null default now()
 );
 
+-- Clients per channel (e.g. MT -> Reliance, D Mart, Vishal Mega Mart)
+create table if not exists public.clients (
+  id uuid primary key default gen_random_uuid(),
+  channel_id uuid not null references public.channels(id) on delete cascade,
+  name text not null,
+  created_at timestamptz not null default now(),
+  unique (channel_id, name)
+);
+
 -- Products, each belonging to one channel
 create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),
   channel_id uuid not null references public.channels(id) on delete cascade,
+  client text,
   name text not null,
-  product_range text,
+  size text,
+  target_bom text,
+  price_point text,
   sku text,
-  notes text,
+  fabric text,
+  description text,
+  assigned_to text,
   status text not null default 'red' check (status in ('red', 'yellow', 'green')),
   illustration_path text,
   created_at timestamptz not null default now(),
@@ -46,11 +60,18 @@ create trigger products_updated_at
 
 -- ---------- Row Level Security: logged-in users only ----------
 alter table public.channels enable row level security;
+alter table public.clients enable row level security;
 alter table public.products enable row level security;
 
 drop policy if exists "authenticated full access channels" on public.channels;
 create policy "authenticated full access channels"
   on public.channels for all
+  to authenticated
+  using (true) with check (true);
+
+drop policy if exists "authenticated full access clients" on public.clients;
+create policy "authenticated full access clients"
+  on public.clients for all
   to authenticated
   using (true) with check (true);
 
@@ -98,5 +119,11 @@ end $$;
 do $$
 begin
   alter publication supabase_realtime add table public.products;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.clients;
 exception when duplicate_object then null;
 end $$;
