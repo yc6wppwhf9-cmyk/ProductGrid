@@ -199,6 +199,9 @@
   .modal textarea { resize: vertical; min-height: 64px; }
   .modal .form-row { display: flex; gap: 10px; }
   .modal .form-row > div { flex: 1; min-width: 0; }
+  .modal .mp-row { display: flex; gap: 18px; flex-wrap: wrap; padding: 6px 2px 2px; }
+  .modal .mp-check { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 500; margin: 0; }
+  .modal .mp-check input { width: auto; }
   .modal .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
 
   /* lightbox */
@@ -306,40 +309,9 @@
           <select id="pfClient"><option value="">— select client —</option></select>
         </div>
       </div>
-      <label>Product name</label>
-      <input id="pfName" required maxlength="200" placeholder="e.g. Boys Crew Neck T-shirt">
-      <div class="form-row">
-        <div>
-          <label>Size</label>
-          <input id="pfSize" maxlength="100" placeholder="e.g. 2-8 yrs">
-        </div>
-        <div>
-          <label>Fabric</label>
-          <input id="pfFabric" maxlength="200" placeholder="e.g. 100% cotton">
-        </div>
-      </div>
-      <div class="form-row">
-        <div>
-          <label>HSCVPL Target BOM</label>
-          <input id="pfBom" maxlength="100" placeholder="e.g. ₹85">
-        </div>
-        <div>
-          <label>D Mart Price Point</label>
-          <input id="pfPrice" maxlength="100" placeholder="e.g. ₹199">
-        </div>
-      </div>
-      <div class="form-row">
-        <div>
-          <label>SKU / product code</label>
-          <input id="pfSku" maxlength="100" placeholder="e.g. SKU-1023">
-        </div>
-        <div>
-          <label>Assigned to</label>
-          <input id="pfAssigned" maxlength="200" placeholder="e.g. Rahul">
-        </div>
-      </div>
-      <label>Product description</label>
-      <textarea id="pfDesc" maxlength="2000" placeholder="Description / remarks for the illustrator…"></textarea>
+      <label id="pfNameLabel">Product name</label>
+      <input id="pfName" required maxlength="200">
+      <div id="pfFields"></div>
       <div class="modal-actions">
         <button type="button" class="ghost" data-close>Cancel</button>
         <button type="submit" class="primary" id="pfSubmit">Save</button>
@@ -517,8 +489,8 @@ function render() {
     let items = products.filter((p) => p.channel_id === ch.id);
     if (q) {
       items = items.filter((p) =>
-        [p.name, p.client, p.size, p.target_bom, p.price_point, p.sku, p.fabric, p.description, p.assigned_to]
-          .some((v) => (v || "").toLowerCase().includes(q)));
+        [p.name, p.client, p.description, p.assigned_to, ...Object.values(p.attrs || {})]
+          .some((v) => String(v || "").toLowerCase().includes(q)));
     }
     const all = products.filter((p) => p.channel_id === ch.id);
     const counts = { red: 0, yellow: 0, green: 0 };
@@ -554,14 +526,23 @@ function cardHtml(p) {
     : `<div class="thumb" onclick="pickFile('${p.id}')" title="Click to upload illustration">
          <div class="placeholder"><span class="ph-ic">🖼️</span><span>No illustration yet — click to upload</span></div></div>`;
 
+  const tpl = templateForProduct(p);
+  const a = p.attrs || {};
   const metaBits = [];
   if (p.client) metaBits.push(`<b>Client:</b> ${esc(p.client)}`);
-  if (p.size) metaBits.push(`<b>Size:</b> ${esc(p.size)}`);
-  if (p.target_bom) metaBits.push(`<b>Target BOM:</b> ${esc(p.target_bom)}`);
-  if (p.price_point) metaBits.push(`<b>Price point:</b> ${esc(p.price_point)}`);
-  if (p.sku) metaBits.push(`<b>SKU:</b> ${esc(p.sku)}`);
-  if (p.fabric) metaBits.push(`<b>Fabric:</b> ${esc(p.fabric)}`);
-  if (p.assigned_to) metaBits.push(`<b>Assigned to:</b> ${esc(p.assigned_to)}`);
+  tpl.fields.forEach((f) => {
+    if (f.type === "textarea") return;
+    const v = f.core ? p[f.key] : a[f.key];
+    if (v) metaBits.push(`<b>${f.label}:</b> ${esc(String(v))}`);
+  });
+  if (tpl.marketplaces) {
+    const sells = tpl.marketplaces.filter((m) => a[m.key]).map((m) => m.label);
+    if (sells.length) metaBits.push(`<b>Sells on:</b> ${sells.map(esc).join(", ")}`);
+  }
+  const noteText = tpl.fields
+    .filter((f) => f.type === "textarea")
+    .map((f) => (f.core ? p[f.key] : a[f.key]))
+    .filter(Boolean).join(" · ");
 
   return `<div class="card">
     ${thumb}
@@ -576,7 +557,7 @@ function cardHtml(p) {
         <button class="t-green ${p.status === "green" ? "lit" : ""}" title="Green = illustration uploaded" onclick="setStatus('${p.id}','green')"></button>
       </div>
     </div>
-    ${p.description ? `<div class="card-notes">📝 ${esc(p.description)}</div>` : ""}
+    ${noteText ? `<div class="card-notes">📝 ${esc(noteText)}</div>` : ""}
     <div class="status-label ${p.status}">● ${statusText}</div>
     <div class="card-actions">
       ${p.status === "red" ? `<button class="start-btn" onclick="setStatus('${p.id}','yellow')">▶ Start work</button>` : ""}
@@ -663,6 +644,90 @@ function openLightbox(id) {
 $("lightbox").onclick = () => $("lightbox").classList.remove("open");
 
 /* =================== PRODUCT CRUD =================== */
+/* ---- Per-channel/part form templates ----
+   Resolution order: client name -> channel name -> default.
+   To give a new channel/part its own form, add an entry here.
+   Non-core field values are stored in the product's attrs JSON. */
+const FIELD_TEMPLATES = {
+  "Ecom OR": {
+    titleLabel: "Category",
+    titlePlaceholder: "e.g. Boys T-shirts",
+    fields: [
+      { key: "under_brand", label: "Under Brand name" },
+      { key: "range_consumption", label: "Range (Consumption)" },
+      { key: "price_point", label: "Price point" },
+      { key: "size", label: "Size" },
+      { key: "competitor", label: "Competitor" },
+      { key: "colors_for_each", label: "Colors for each" },
+      { key: "assigned_to", label: "Assigned to", core: true },
+      { key: "features", label: "Features", type: "textarea" },
+    ],
+    marketplaces: [
+      { key: "mp_amazon", label: "Amazon" },
+      { key: "mp_flipkart", label: "Flipkart" },
+      { key: "mp_myntra", label: "Myntra/Ajio" },
+    ],
+  },
+  "MT": {
+    titleLabel: "Product name",
+    titlePlaceholder: "e.g. Boys Crew Neck T-shirt",
+    fields: [
+      { key: "size", label: "Size" },
+      { key: "fabric", label: "Fabric" },
+      { key: "target_bom", label: "HSCVPL Target BOM" },
+      { key: "price_point", label: "D Mart Price Point" },
+      { key: "sku", label: "SKU / product code" },
+      { key: "assigned_to", label: "Assigned to", core: true },
+      { key: "description", label: "Product description", core: true, type: "textarea" },
+    ],
+  },
+};
+FIELD_TEMPLATES.default = FIELD_TEMPLATES["MT"];
+
+function resolveTemplate(channelName, clientName) {
+  return FIELD_TEMPLATES[clientName] || FIELD_TEMPLATES[channelName] || FIELD_TEMPLATES.default;
+}
+
+function currentTemplate() {
+  const ch = channels.find((c) => c.id === $("pfChannel").value);
+  return resolveTemplate(ch ? ch.name : "", $("pfClient").value);
+}
+
+function templateForProduct(p) {
+  const ch = channels.find((c) => c.id === p.channel_id);
+  return resolveTemplate(ch ? ch.name : "", p.client || "");
+}
+
+function collectFieldValues() {
+  const vals = {};
+  document.querySelectorAll("#pfFields [data-fkey]").forEach((el) => {
+    vals[el.dataset.fkey] = el.type === "checkbox" ? el.checked : el.value.trim();
+  });
+  return vals;
+}
+
+function renderProductFields(values = {}) {
+  const tpl = currentTemplate();
+  $("pfNameLabel").textContent = tpl.titleLabel;
+  $("pfName").placeholder = tpl.titlePlaceholder || "";
+  let html = "";
+  const inputs = tpl.fields.filter((f) => f.type !== "textarea");
+  for (let i = 0; i < inputs.length; i += 2) {
+    html += '<div class="form-row">' + inputs.slice(i, i + 2).map((f) =>
+      `<div><label>${f.label}</label><input data-fkey="${f.key}" maxlength="300" value="${esc(String(values[f.key] || ""))}"></div>`
+    ).join("") + "</div>";
+  }
+  if (tpl.marketplaces) {
+    html += '<label>Sells on</label><div class="mp-row">' + tpl.marketplaces.map((m) =>
+      `<label class="mp-check"><input type="checkbox" data-fkey="${m.key}" ${values[m.key] ? "checked" : ""}> ${m.label}</label>`
+    ).join("") + "</div>";
+  }
+  tpl.fields.filter((f) => f.type === "textarea").forEach((f) => {
+    html += `<label>${f.label}</label><textarea data-fkey="${f.key}" maxlength="2000">${esc(String(values[f.key] || ""))}</textarea>`;
+  });
+  $("pfFields").innerHTML = html;
+}
+
 function populateClientOptions(selected) {
   const chId = $("pfChannel").value;
   const names = clients.filter((c) => c.channel_id === chId).map((c) => c.name);
@@ -699,13 +764,7 @@ function openProductModal(productId, channelId) {
   $("pfChannel").value = p ? p.channel_id : (presetChannelId || (channels[0] && channels[0].id) || "");
   populateClientOptions(p ? (p.client || "") : "");
   $("pfName").value = p ? p.name : "";
-  $("pfSize").value = p ? (p.size || "") : "";
-  $("pfFabric").value = p ? (p.fabric || "") : "";
-  $("pfBom").value = p ? (p.target_bom || "") : "";
-  $("pfPrice").value = p ? (p.price_point || "") : "";
-  $("pfSku").value = p ? (p.sku || "") : "";
-  $("pfAssigned").value = p ? (p.assigned_to || "") : "";
-  $("pfDesc").value = p ? (p.description || "") : "";
+  renderProductFields(p ? { ...(p.attrs || {}), description: p.description || "", assigned_to: p.assigned_to || "" } : {});
   $("productModal").classList.add("open");
   $("pfName").focus();
 }
@@ -717,14 +776,21 @@ async function saveProduct(e) {
     channel_id: $("pfChannel").value,
     client: clientVal && clientVal !== "__new__" ? clientVal : null,
     name: $("pfName").value.trim(),
-    size: $("pfSize").value.trim() || null,
-    fabric: $("pfFabric").value.trim() || null,
-    target_bom: $("pfBom").value.trim() || null,
-    price_point: $("pfPrice").value.trim() || null,
-    sku: $("pfSku").value.trim() || null,
-    assigned_to: $("pfAssigned").value.trim() || null,
-    description: $("pfDesc").value.trim() || null,
+    description: null,
+    assigned_to: null,
+    attrs: {},
   };
+  document.querySelectorAll("#pfFields [data-fkey]").forEach((el) => {
+    const key = el.dataset.fkey;
+    const val = el.type === "checkbox" ? el.checked : el.value.trim();
+    if (key === "description" || key === "assigned_to") {
+      payload[key] = val || null;
+    } else if (el.type === "checkbox") {
+      if (val) payload.attrs[key] = true;
+    } else if (val) {
+      payload.attrs[key] = val;
+    }
+  });
   if (!payload.channel_id) { toast("Create a channel first"); return; }
   let error;
   if (editingProductId) {
@@ -809,8 +875,8 @@ if (configured) {
   };
   $("productForm").onsubmit = saveProduct;
   $("channelForm").onsubmit = saveChannel;
-  $("pfChannel").onchange = () => populateClientOptions("");
-  $("pfClient").onchange = handleClientSelect;
+  $("pfChannel").onchange = () => { populateClientOptions(""); renderProductFields(collectFieldValues()); };
+  $("pfClient").onchange = async () => { await handleClientSelect(); renderProductFields(collectFieldValues()); };
   $("fileInput").onchange = handleFile;
   $("searchBox").oninput = render;
   $("channelFilter").onchange = render;

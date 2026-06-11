@@ -1,17 +1,15 @@
 -- ============================================================
--- Migration: new product columns + clients-per-channel table
+-- Migration: flexible per-channel product fields + clients table
 -- Run this ONCE in the Supabase SQL Editor (your existing project).
+-- Safe to run again — every step skips what already exists.
 -- Fresh installs should run setup.sql instead — not this file.
 -- ============================================================
 
--- New product fields from the planning sheet
+-- Core columns
 alter table public.products
   add column if not exists client text,
-  add column if not exists size text,
-  add column if not exists target_bom text,
-  add column if not exists price_point text,
-  add column if not exists fabric text,
-  add column if not exists assigned_to text;
+  add column if not exists assigned_to text,
+  add column if not exists attrs jsonb not null default '{}'::jsonb;
 
 -- notes -> description (keeps any text already entered)
 do $$
@@ -25,9 +23,28 @@ begin
   end if;
 end $$;
 
-alter table public.products drop column if exists product_range;
+alter table public.products
+  add column if not exists description text;
 
--- Clients per channel (e.g. MT -> Reliance, D Mart, Vishal Mega Mart)
+-- Fold any old per-template columns into the attrs JSON, then drop them
+do $$
+declare col text;
+begin
+  foreach col in array array['size', 'target_bom', 'price_point', 'sku', 'fabric', 'product_range']
+  loop
+    if exists (select 1 from information_schema.columns
+               where table_schema = 'public' and table_name = 'products' and column_name = col)
+    then
+      execute format(
+        'update public.products set attrs = attrs || jsonb_build_object(%L, %I) where %I is not null',
+        col, col, col);
+      execute format('alter table public.products drop column %I', col);
+    end if;
+  end loop;
+end $$;
+
+-- Clients per channel (e.g. MT -> Reliance, D Mart, Vishal Mega Mart;
+-- ECom -> Ecom OR, Ecom-MP)
 create table if not exists public.clients (
   id uuid primary key default gen_random_uuid(),
   channel_id uuid not null references public.channels(id) on delete cascade,
