@@ -42,3 +42,5 @@ Alternatively, simply send teammates the configured `index.html` file — data s
 ## Team access
 
 Each teammate clicks **Sign up** on the login screen with their own email + password (one-time email confirmation). Note: anyone with the link can create an account — to restrict access, disable sign-ups in Supabase (**Authentication → Sign In / Up**) after your team has registered.
+
+> Auto-deploys from the main branch via Vercel.
