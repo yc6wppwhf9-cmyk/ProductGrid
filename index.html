@@ -117,6 +117,17 @@
   .assign-pill { font-size: 12px; background: #ede9fe; color: #5b21b6; border-radius: 20px; padding: 2px 10px; font-weight: 500; white-space: nowrap; }
   .assign-empty { font-size: 12px; color: var(--text3); }
 
+  /* inline quick-edit selects in rows */
+  .badge-select { appearance: none; -webkit-appearance: none; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; padding: 3px 22px 3px 10px; border-radius: 20px; border: 1px solid; cursor: pointer; max-width: 100%;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="6"><path d="M0 0l4 6 4-6z" fill="%23777"/></svg>');
+    background-repeat: no-repeat; background-position: right 8px center; }
+  .assign-select { appearance: none; -webkit-appearance: none; font-size: 12px; font-weight: 500; padding: 3px 22px 3px 10px; border-radius: 20px; border: none; cursor: pointer; max-width: 100%; background-color: #ede9fe; color: #5b21b6;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="6"><path d="M0 0l4 6 4-6z" fill="%23777"/></svg>');
+    background-repeat: no-repeat; background-position: right 8px center; }
+  .assign-select.is-empty { background-color: var(--surface2); color: var(--text3); }
+  .tab-x { margin-left: 7px; color: var(--text3); font-size: 11px; cursor: pointer; }
+  .tab-x:hover { color: var(--todo-text); }
+
   .action-btn { font-size: 11px; padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border-strong); background: var(--surface2); color: var(--text2); cursor: pointer; white-space: nowrap; }
   .action-btn:hover { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
   .img-thumb { width: 36px; height: 36px; border-radius: 5px; object-fit: cover; border: 1px solid var(--border); cursor: zoom-in; }
@@ -225,8 +236,12 @@
 <!-- ENTRY MODAL -->
 <div class="modal-overlay" id="entryModal">
   <div class="modal">
-    <h3 id="entryModalTitle">Add entry</h3>
+    <h3 id="entryModalTitle">New product</h3>
     <form id="entryForm">
+      <div class="modal-field">
+        <label>Channel</label>
+        <select id="efChannel" required></select>
+      </div>
       <div class="modal-field">
         <label id="efNameLabel">Product</label>
         <input id="efName" required maxlength="200" />
@@ -510,8 +525,26 @@ function renderStats() {
 function renderTabs() {
   $("tabs").innerHTML = channels.map((c) => {
     const n = products.filter((p) => p.channel_id === c.id).length;
-    return `<div class="tab ${c.id === activeChannelId ? "active" : ""}" onclick="switchTab('${c.id}')">${esc(c.name)} <span class="tab-count">${n}</span></div>`;
+    const isActive = c.id === activeChannelId;
+    const x = isActive ? `<span class="tab-x" title="Delete this channel" onclick="event.stopPropagation(); deleteChannel('${c.id}')">✕</span>` : "";
+    return `<div class="tab ${isActive ? "active" : ""}" onclick="switchTab('${c.id}')">${esc(c.name)} <span class="tab-count">${n}</span>${x}</div>`;
   }).join("") || '<div style="padding:10px;color:var(--text3);font-size:13px">No channels yet — click ＋ Channel</div>';
+}
+
+async function deleteChannel(id) {
+  const ch = channels.find((c) => c.id === id);
+  if (!ch) return;
+  const items = products.filter((p) => p.channel_id === id);
+  const msg = items.length
+    ? `Delete channel "${ch.name}" and its ${items.length} product(s)? This cannot be undone.`
+    : `Delete channel "${ch.name}"?`;
+  if (!confirm(msg)) return;
+  const paths = items.filter((p) => p.illustration_path).map((p) => p.illustration_path);
+  const { error } = await sb.from("channels").delete().eq("id", id);
+  if (error) { toast("Delete failed: " + error.message); return; }
+  if (paths.length) await sb.storage.from(BUCKET).remove(paths);
+  await loadAll();
+  toast(`Channel "${ch.name}" deleted`);
 }
 
 function switchTab(id) { activeChannelId = id; renderTabs(); renderPanel(); }
@@ -570,11 +603,16 @@ function renderPanel() {
         const v = fieldValue(p, x);
         return `<div class="grid-cell ${x.small ? "cell-small" : ""}">${v != null && v !== "" ? esc(String(v)) : "—"}</div>`;
       }),
-      `<div class="grid-cell">${p.assigned_to ? `<span class="assign-pill">${esc(p.assigned_to)}</span>` : '<span class="assign-empty">Unassigned</span>'}</div>`,
-      `<div class="grid-cell"><span class="badge badge-${STATUS_META[p.status].cls}" onclick="openEntryModal('${p.id}')" title="Click to edit"><span class="dot dot-${STATUS_META[p.status].cls}"></span>${STATUS_META[p.status].label}</span></div>`,
+      `<div class="grid-cell"><select class="assign-select ${p.assigned_to ? "" : "is-empty"}" title="Change assignee" onchange="quickAssign('${p.id}', this.value)">
+          <option value="">Unassigned</option>
+          ${assignedVals.map((d) => `<option value="${esc(d)}" ${p.assigned_to === d ? "selected" : ""}>${esc(d)}</option>`).join("")}
+        </select></div>`,
+      `<div class="grid-cell"><select class="badge-select badge-${STATUS_META[p.status].cls}" title="Change status" onchange="quickSetStatus('${p.id}', this.value)">
+          ${Object.entries(STATUS_META).map(([k, m]) => `<option value="${k}" ${p.status === k ? "selected" : ""}>${m.label}</option>`).join("")}
+        </select></div>`,
       `<div class="grid-cell">${p.illustration_path
         ? `<img class="img-thumb" src="${esc(publicUrl(p.illustration_path))}" loading="lazy" onclick="openLightbox('${p.id}')" title="View full size" />`
-        : `<div class="img-placeholder" onclick="openEntryModal('${p.id}')" title="Upload illustration">🖼</div>`}</div>`,
+        : `<div class="img-placeholder" onclick="pickRowFile('${p.id}')" title="Upload illustration">🖼</div>`}</div>`,
       `<div class="grid-cell"><button class="action-btn" onclick="openEntryModal('${p.id}')">✎ Edit</button></div>`,
     ];
     return `<div class="grid-row" style="grid-template-columns:${tpl.grid}">${cells.join("")}</div>`;
@@ -602,7 +640,7 @@ function renderPanel() {
         <input type="text" value="${esc(f.search)}" placeholder="Search…" style="width:160px" oninput="setFilter('search', this.value)" /></div>
       <button class="btn-reset" onclick="resetFilters()">Reset</button>
       <div class="grow"></div>
-      <button class="btn-primary" onclick="openEntryModal(null)">＋ Add Entry</button>
+      <button class="btn-primary" onclick="openEntryModal(null)">＋ New Product</button>
     </div>
     <div class="legend">
       <span class="legend-item"><span class="dot dot-done"></span>Done</span>
@@ -624,30 +662,45 @@ function resetFilters() {
 }
 
 /* =================== ENTRY MODAL =================== */
-function openEntryModal(productId) {
-  const ch = activeChannel();
-  if (!ch) { toast("Create a channel first"); return; }
+function entryChannel() {
+  return channels.find((c) => c.id === $("efChannel").value) || activeChannel();
+}
+
+function renderEntryFields(values = {}) {
+  const ch = entryChannel();
   const tpl = templateFor(ch);
-  const p = productId ? products.find((x) => x.id === productId) : null;
-  editingId = productId;
-  pendingFile = null;
-  pendingRemoveImage = false;
-
-  $("entryModalTitle").textContent = p ? (p.name || "Edit entry") : `Add entry — ${ch.name}`;
   $("efNameLabel").textContent = tpl.titleLabel;
-  $("efName").value = p ? p.name : "";
-
   const chProducts = products.filter((x) => x.channel_id === ch.id);
-  $("efFields").innerHTML = "";
   let html = "";
   tpl.fields.forEach((fdef) => {
-    const v = p ? fieldValue(p, fdef) : "";
+    const v = values[fdef.key];
     const listId = fdef.suggest ? `dl-${fdef.key}` : "";
     html += `<div class="modal-field"><label>${fdef.label}</label>
       <input data-fkey="${fdef.key}" maxlength="500" value="${esc(String(v ?? ""))}" ${listId ? `list="${listId}"` : ""} />
       ${listId ? `<datalist id="${listId}">${unique(chProducts.map((x) => fieldValue(x, fdef))).map((s) => `<option value="${esc(String(s))}">`).join("")}</datalist>` : ""}</div>`;
   });
   $("efFields").innerHTML = html;
+}
+
+function collectEntryValues() {
+  const vals = {};
+  document.querySelectorAll("#efFields [data-fkey]").forEach((el) => { vals[el.dataset.fkey] = el.value.trim(); });
+  return vals;
+}
+
+function openEntryModal(productId) {
+  if (!channels.length) { toast("Create a channel first"); return; }
+  const p = productId ? products.find((x) => x.id === productId) : null;
+  editingId = productId;
+  pendingFile = null;
+  pendingRemoveImage = false;
+
+  $("efChannel").innerHTML = channels.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  $("efChannel").value = p ? p.channel_id : activeChannelId;
+
+  $("entryModalTitle").textContent = p ? (p.name || "Edit product") : "New product";
+  $("efName").value = p ? p.name : "";
+  renderEntryFields(p ? { ...(p.attrs || {}), client: p.client ?? "" } : {});
 
   const assignedVals = unique([...DESIGNERS, ...(p && p.assigned_to ? [p.assigned_to] : [])]);
   $("efAssigned").innerHTML = '<option value="">TBD (Unassigned)</option>' +
@@ -686,7 +739,7 @@ function removePendingImage() {
 
 async function saveEntry(e) {
   e.preventDefault();
-  const ch = activeChannel();
+  const ch = entryChannel();
   const tpl = templateFor(ch);
   const p = editingId ? products.find((x) => x.id === editingId) : null;
 
@@ -738,6 +791,52 @@ async function saveEntry(e) {
   }
 }
 
+/* ---- inline quick edits from the grid ---- */
+async function quickSetStatus(id, status) {
+  const p = products.find((x) => x.id === id);
+  if (!p || p.status === status) return;
+  const prev = p.status;
+  p.status = status;
+  renderAll();
+  const { error } = await sb.from("products").update({ status }).eq("id", id);
+  if (error) { p.status = prev; renderAll(); toast("Update failed: " + error.message); }
+}
+
+async function quickAssign(id, assigned) {
+  const p = products.find((x) => x.id === id);
+  if (!p) return;
+  const prev = p.assigned_to;
+  p.assigned_to = assigned || null;
+  renderAll();
+  const { error } = await sb.from("products").update({ assigned_to: assigned || null }).eq("id", id);
+  if (error) { p.assigned_to = prev; renderAll(); toast("Update failed: " + error.message); }
+}
+
+let rowUploadTarget = null;
+function pickRowFile(id) {
+  rowUploadTarget = id;
+  $("fileInput").value = "";
+  $("fileInput").click();
+}
+
+async function uploadRowImage(id, file) {
+  const p = products.find((x) => x.id === id);
+  if (!p) return;
+  toast("Uploading illustration…");
+  const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+  const path = `${id}/${Date.now()}.${ext}`;
+  const { error: upErr } = await sb.storage.from(BUCKET).upload(path, file, { upsert: true });
+  if (upErr) { toast("Upload failed: " + upErr.message); return; }
+  const old = p.illustration_path;
+  const { error } = await sb.from("products").update({ illustration_path: path, status: "green" }).eq("id", id);
+  if (error) { toast("Save failed: " + error.message); return; }
+  if (old) await sb.storage.from(BUCKET).remove([old]);
+  p.illustration_path = path;
+  p.status = "green";
+  renderAll();
+  toast("Illustration uploaded — marked Done");
+}
+
 async function deleteEntry() {
   const p = products.find((x) => x.id === editingId);
   if (!p) return;
@@ -784,14 +883,21 @@ if (configured) {
   $("entryForm").onsubmit = saveEntry;
   $("efDelete").onclick = deleteEntry;
   $("efUploadArea").onclick = () => { $("fileInput").value = ""; $("fileInput").click(); };
-  $("fileInput").onchange = () => {
+  $("efChannel").onchange = () => renderEntryFields(collectEntryValues());
+  $("fileInput").onchange = async () => {
     const file = $("fileInput").files[0];
     if (!file) return;
-    if (file.size > 15 * 1024 * 1024) { toast("Image too large (max 15 MB)"); return; }
-    pendingFile = file;
-    pendingRemoveImage = false;
-    $("efStatus").value = "green"; // uploading an illustration marks it Done (change manually if needed)
-    renderUploadPreview(products.find((x) => x.id === editingId));
+    if (file.size > 15 * 1024 * 1024) { toast("Image too large (max 15 MB)"); rowUploadTarget = null; return; }
+    if (rowUploadTarget) {
+      const id = rowUploadTarget;
+      rowUploadTarget = null;
+      await uploadRowImage(id, file);
+    } else {
+      pendingFile = file;
+      pendingRemoveImage = false;
+      $("efStatus").value = "green"; // uploading an illustration marks it Done (change manually if needed)
+      renderUploadPreview(products.find((x) => x.id === editingId));
+    }
   };
 
   sb.auth.getSession().then(({ data }) => {
