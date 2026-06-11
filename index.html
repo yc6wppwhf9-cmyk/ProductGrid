@@ -329,7 +329,7 @@ const CHANNEL_TEMPLATES = {
     titleLabel: "Product",
     grid: "2fr 1fr 1fr 1.2fr 1.2fr 1.3fr 1fr 80px",
     fields: [
-      { key: "client", label: "Client", core: true, suggest: true },
+      { key: "client", label: "Client", core: true, suggest: true, options: ["Dmart", "RIL", "VMM"] },
       { key: "size", label: "Size" },
       { key: "price", label: "Price Point" },
       { key: "skus", label: "No. of SKUs", col: false },
@@ -341,7 +341,7 @@ const CHANNEL_TEMPLATES = {
     titleLabel: "Product",
     grid: "2fr 1.2fr 1fr 1fr 1.2fr 1.3fr 1fr 80px",
     fields: [
-      { key: "category", label: "Category", suggest: true },
+      { key: "category", label: "Category", suggest: true, options: ["College Bag", "Laptop Bag", "Hiking"] },
       { key: "price", label: "Price Point" },
       { key: "skus", label: "No. of SKUs" },
     ],
@@ -360,7 +360,7 @@ const CHANNEL_TEMPLATES = {
     titleLabel: "Category",
     grid: "1.6fr 1.2fr 1fr 1.7fr 1.2fr 0.9fr 1.2fr 1.2fr 1fr 80px",
     fields: [
-      { key: "brand", label: "Brand", suggest: true },
+      { key: "brand", label: "Brand", suggest: true, options: ["Priority", "Good (Hashtag)"] },
       { key: "price", label: "Price" },
       { key: "features", label: "Features", small: true },
       { key: "size", label: "Size / Litres" },
@@ -372,7 +372,7 @@ const CHANNEL_TEMPLATES = {
     titleLabel: "Category",
     grid: "2fr 1.5fr 1.2fr 1.2fr 1.3fr 1fr 80px",
     fields: [
-      { key: "subchannel", label: "Channel", suggest: true },
+      { key: "subchannel", label: "Channel", suggest: true, options: ["Insti – Ayyappan"] },
       { key: "price", label: "Price Point" },
     ],
     filters: [{ key: "subchannel", label: "Channel" }],
@@ -673,19 +673,41 @@ function renderEntryFields(values = {}) {
   const chProducts = products.filter((x) => x.channel_id === ch.id);
   let html = "";
   tpl.fields.forEach((fdef) => {
-    const v = values[fdef.key];
-    const listId = fdef.suggest ? `dl-${fdef.key}` : "";
-    html += `<div class="modal-field"><label>${fdef.label}</label>
-      <input data-fkey="${fdef.key}" maxlength="500" value="${esc(String(v ?? ""))}" ${listId ? `list="${listId}"` : ""} />
-      ${listId ? `<datalist id="${listId}">${unique(chProducts.map((x) => fieldValue(x, fdef))).map((s) => `<option value="${esc(String(s))}">`).join("")}</datalist>` : ""}</div>`;
+    const v = String(values[fdef.key] ?? "");
+    if (fdef.suggest) {
+      const opts = unique([...(fdef.options || []), ...chProducts.map((x) => fieldValue(x, fdef)), ...(v ? [v] : [])].map((s) => String(s ?? "")).filter(Boolean));
+      html += `<div class="modal-field"><label>${fdef.label}</label>
+        <select data-fkey="${fdef.key}" onchange="handleNewOption(this, '${esc(fdef.label)}')">
+          <option value="">— select ${esc(fdef.label.toLowerCase())} —</option>
+          ${opts.map((o) => `<option value="${esc(o)}" ${v === o ? "selected" : ""}>${esc(o)}</option>`).join("")}
+          <option value="__new__">＋ Add new ${esc(fdef.label.toLowerCase())}…</option>
+        </select></div>`;
+    } else {
+      html += `<div class="modal-field"><label>${fdef.label}</label>
+        <input data-fkey="${fdef.key}" maxlength="500" value="${esc(v)}" /></div>`;
+    }
   });
   $("efFields").innerHTML = html;
 }
 
 function collectEntryValues() {
   const vals = {};
-  document.querySelectorAll("#efFields [data-fkey]").forEach((el) => { vals[el.dataset.fkey] = el.value.trim(); });
+  document.querySelectorAll("#efFields [data-fkey]").forEach((el) => {
+    const v = el.value.trim();
+    vals[el.dataset.fkey] = v === "__new__" ? "" : v;
+  });
   return vals;
+}
+
+function handleNewOption(el, label) {
+  if (el.value !== "__new__") return;
+  const name = (prompt(`New ${label}:`) || "").trim();
+  if (!name) { el.value = ""; return; }
+  const opt = document.createElement("option");
+  opt.value = name;
+  opt.textContent = name;
+  el.insertBefore(opt, el.querySelector('option[value="__new__"]'));
+  el.value = name;
 }
 
 function openEntryModal(productId) {
@@ -754,7 +776,8 @@ async function saveEntry(e) {
   };
   document.querySelectorAll("#efFields [data-fkey]").forEach((el) => {
     const def = tpl.fields.find((x) => x.key === el.dataset.fkey);
-    const val = el.value.trim();
+    let val = el.value.trim();
+    if (val === "__new__") val = "";
     if (def && def.core) payload[def.key] = val || null;
     else if (val) payload.attrs[el.dataset.fkey] = val;
   });
