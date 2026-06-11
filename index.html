@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Grid — Illustration Tracker</title>
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --ink: #1d2433;
+    --muted: #6b7385;
+    --line: #e3e7ef;
+    --accent: #3b5bdb;
+    --accent-soft: #e7ecfd;
+    --red: #e03131;
+    --yellow: #f5b301;
+    --green: #2f9e44;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(20, 30, 60, .08), 0 6px 18px rgba(20, 30, 60, .06);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  button { font-family: inherit; cursor: pointer; }
+  input, select, textarea { font-family: inherit; font-size: 14px; }
+
+  /* ---------- Auth screen ---------- */
+  #authScreen {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .auth-card {
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 36px;
+    width: 100%; max-width: 380px;
+  }
+  .auth-card h1 { margin: 0 0 4px; font-size: 22px; }
+  .auth-card .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .auth-card label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 5px; }
+  .auth-card input {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  .auth-card .primary { width: 100%; margin-top: 20px; }
+  .auth-toggle { text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .auth-toggle a { color: var(--accent); cursor: pointer; font-weight: 600; text-decoration: none; }
+  .auth-msg { margin-top: 14px; font-size: 13px; border-radius: 8px; padding: 10px 12px; display: none; }
+  .auth-msg.error { display: block; background: #fdeaea; color: #b02525; }
+  .auth-msg.info  { display: block; background: #e8f5ec; color: #20753a; }
+  .logo-lights { display: flex; gap: 6px; margin-bottom: 16px; }
+  .logo-lights span { width: 14px; height: 14px; border-radius: 50%; }
+
+  /* ---------- Buttons ---------- */
+  .primary {
+    background: var(--accent); color: #fff; border: none;
+    padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 14px;
+  }
+  .primary:hover { background: #3250c4; }
+  .ghost {
+    background: transparent; border: 1px solid var(--line); color: var(--ink);
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  }
+  .ghost:hover { background: #eef1f7; }
+  .danger-link { background: none; border: none; color: var(--red); font-size: 12px; padding: 4px; }
+  .icon-btn { background: none; border: none; font-size: 14px; color: var(--muted); padding: 4px 6px; border-radius: 6px; }
+  .icon-btn:hover { background: #eef1f7; color: var(--ink); }
+
+  /* ---------- App layout ---------- */
+  #appScreen { display: none; }
+  header.topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--card); border-bottom: 1px solid var(--line);
+    padding: 12px 24px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .topbar h1 { font-size: 17px; margin: 0; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+  .topbar .mini-lights { display: flex; gap: 4px; }
+  .topbar .mini-lights span { width: 10px; height: 10px; border-radius: 50%; }
+  .topbar .spacer { flex: 1; }
+  .topbar input[type="search"] {
+    padding: 9px 14px; border: 1px solid var(--line); border-radius: 8px;
+    width: 230px; max-width: 100%;
+  }
+  .topbar select { padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .user-chip { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+  main { padding: 24px; max-width: 1500px; margin: 0 auto; }
+
+  .empty-state {
+    text-align: center; padding: 70px 20px; color: var(--muted);
+  }
+  .empty-state .big { font-size: 40px; margin-bottom: 10px; }
+
+  /* ---------- Channel sections ---------- */
+  .channel-section { margin-bottom: 34px; }
+  .channel-head {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 16px; margin-bottom: 14px;
+    background: var(--card); border: 1px solid var(--line);
+    border-left: 5px solid var(--accent);
+    border-radius: 10px;
+  }
+  .channel-head h2 { font-size: 16px; margin: 0; }
+  .channel-counts { display: flex; gap: 10px; font-size: 12.5px; color: var(--muted); }
+  .channel-counts b { color: var(--ink); }
+  .count-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+  .channel-head .grow { flex: 1; }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  /* ---------- Product card ---------- */
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; overflow: hidden;
+    transition: transform .12s ease;
+  }
+  .card:hover { transform: translateY(-2px); }
+  .thumb {
+    height: 150px; background: #eef1f6;
+    display: flex; align-items: center; justify-content: center;
+    color: #9aa3b5; font-size: 13px; cursor: pointer; position: relative;
+    border-bottom: 1px solid var(--line);
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+  .thumb .placeholder { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .thumb .placeholder .ph-ic { font-size: 28px; }
+  .card-body { padding: 12px 14px 6px; display: flex; gap: 10px; }
+  .card-info { flex: 1; min-width: 0; }
+  .card-info .pname { font-weight: 700; font-size: 14.5px; margin-bottom: 2px; word-break: break-word; }
+  .card-info .meta { font-size: 12.5px; color: var(--muted); line-height: 1.5; word-break: break-word; }
+  .card-info .meta b { color: #444c5e; font-weight: 600; }
+  .card-notes { font-size: 12px; color: var(--muted); padding: 0 14px 4px; font-style: italic; word-break: break-word; }
+
+  /* traffic light */
+  .tlight {
+    display: flex; flex-direction: column; gap: 5px;
+    background: #2b3040; padding: 7px 6px; border-radius: 20px;
+    align-self: flex-start;
+  }
+  .tlight button {
+    width: 18px; height: 18px; border-radius: 50%; border: none;
+    opacity: .25; transition: opacity .15s, box-shadow .15s; padding: 0;
+  }
+  .tlight button.lit { opacity: 1; box-shadow: 0 0 8px 1px currentColor; }
+  .tlight .t-red    { background: var(--red);    color: var(--red); }
+  .tlight .t-yellow { background: var(--yellow); color: var(--yellow); }
+  .tlight .t-green  { background: var(--green);  color: var(--green); }
+
+  .status-label { font-size: 11.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; padding: 0 14px 8px; }
+  .status-label.red    { color: var(--red); }
+  .status-label.yellow { color: #c79200; }
+  .status-label.green  { color: var(--green); }
+
+  .card-actions {
+    display: flex; gap: 6px; align-items: center;
+    border-top: 1px solid var(--line); padding: 8px 10px;
+    flex-wrap: wrap;
+  }
+  .upload-btn {
+    background: var(--accent-soft); color: var(--accent); border: none;
+    font-size: 12.5px; font-weight: 700; padding: 7px 12px; border-radius: 7px;
+  }
+  .upload-btn:hover { background: #d8e0fb; }
+  .card-actions .right { margin-left: auto; display: flex; }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(15, 20, 35, .45);
+    display: none; align-items: center; justify-content: center; z-index: 100; padding: 20px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--card); border-radius: 14px; box-shadow: var(--shadow);
+    width: 100%; max-width: 440px; padding: 24px; max-height: 92vh; overflow: auto;
+  }
+  .modal h3 { margin: 0 0 18px; font-size: 17px; }
+  .modal label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
+  .modal input, .modal select, .modal textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px;
+  }
+  .modal textarea { resize: vertical; min-height: 64px; }
+  .modal .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+
+  /* lightbox */
+  #lightbox {
+    position: fixed; inset: 0; background: rgba(10, 14, 25, .85);
+    display: none; align-items: center; justify-content: center; z-index: 200; cursor: zoom-out;
+    flex-direction: column; gap: 12px; padding: 24px;
+  }
+  #lightbox.open { display: flex; }
+  #lightbox img { max-width: 92vw; max-height: 84vh; border-radius: 8px; background: #fff; }
+  #lightbox .cap { color: #dfe4ee; font-size: 14px; }
+
+  /* toast */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1d2433; color: #fff; padding: 11px 20px; border-radius: 9px;
+    font-size: 13.5px; box-shadow: var(--shadow); z-index: 300;
+    opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  #toast.show { opacity: 1; }
+
+  /* setup notice */
+  #setupNotice {
+    min-height: 100vh; display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  #setupNotice .auth-card { max-width: 520px; }
+  #setupNotice code { background: #eef1f7; padding: 2px 6px; border-radius: 5px; font-size: 13px; }
+
+  @media (max-width: 640px) {
+    main { padding: 14px; }
+    .topbar { padding: 10px 14px; }
+    .topbar input[type="search"] { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ====== SETUP NOTICE (shown when keys are not configured) ====== -->
+<div id="setupNotice">
+  <div class="auth-card">
+    <div class="logo-lights">
+      <span style="background:var(--red)"></span><span style="background:var(--yellow)"></span><span style="background:var(--green)"></span>
+    </div>
+    <h1>Almost there…</h1>
+    <p class="sub">This app is not connected to Supabase yet. Open <code>index.html</code> and fill in
+    <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> at the top of the script section.</p>
+  </div>
+</div>
+
+<!-- ====== AUTH SCREEN ====== -->
+<div id="authScreen" style="display:none">
+  <div class="auth-card">
+    <div class="logo-lights">
+      <span style="background:var(--red)"></span><span style="background:var(--yellow)"></span><span style="background:var(--green)"></span>
+    </div>
+    <h1>Product Grid</h1>
+    <div class="sub">Channel-wise illustration tracker</div>
+
+    <form id="authForm">
+      <label for="authEmail">Email</label>
+      <input type="email" id="authEmail" required autocomplete="email" placeholder="you@company.com">
+      <label for="authPass">Password</label>
+      <input type="password" id="authPass" required minlength="6" autocomplete="current-password" placeholder="••••••••">
+      <button type="submit" class="primary" id="authSubmit">Log in</button>
+    </form>
+    <div class="auth-msg" id="authMsg"></div>
+    <div class="auth-toggle" id="authToggle">
+      No account yet? <a id="authSwitch">Sign up</a>
+    </div>
+  </div>
+</div>
+
+<!-- ====== MAIN APP ====== -->
+<div id="appScreen">
+  <header class="topbar">
+    <h1>
+      <span class="mini-lights">
+        <span style="background:var(--red)"></span><span style="background:var(--yellow)"></span><span style="background:var(--green)"></span>
+      </span>
+      Product Grid
+    </h1>
+    <div class="spacer"></div>
+    <input type="search" id="searchBox" placeholder="Search product, range, SKU…">
+    <select id="channelFilter"><option value="">All channels</option></select>
+    <button class="ghost" id="addChannelBtn">＋ Channel</button>
+    <button class="primary" id="addProductBtn">＋ Product</button>
+    <span class="user-chip" id="userChip"></span>
+    <button class="ghost" id="logoutBtn">Log out</button>
+  </header>
+  <main id="gridRoot"></main>
+</div>
+
+<!-- ====== PRODUCT MODAL ====== -->
+<div class="modal-backdrop" id="productModal">
+  <div class="modal">
+    <h3 id="productModalTitle">Add product</h3>
+    <form id="productForm">
+      <label>Channel</label>
+      <select id="pfChannel" required></select>
+      <label>Product name</label>
+      <input id="pfName" required maxlength="200" placeholder="e.g. Classic Honey 500g">
+      <label>Product range</label>
+      <input id="pfRange" maxlength="200" placeholder="e.g. Premium Range">
+      <label>SKU / product code</label>
+      <input id="pfSku" maxlength="100" placeholder="e.g. SKU-1023">
+      <label>Notes / remarks</label>
+      <textarea id="pfNotes" maxlength="2000" placeholder="Any remarks for the illustrator…"></textarea>
+      <div class="modal-actions">
+        <button type="button" class="ghost" data-close>Cancel</button>
+        <button type="submit" class="primary" id="pfSubmit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ====== CHANNEL MODAL ====== -->
+<div class="modal-backdrop" id="channelModal">
+  <div class="modal">
+    <h3 id="channelModalTitle">Add channel</h3>
+    <form id="channelForm">
+      <label>Channel name</label>
+      <input id="cfName" required maxlength="120" placeholder="e.g. Amazon, Flipkart, Retail…">
+      <div class="modal-actions">
+        <button type="button" class="ghost" data-close>Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="lightbox"><img id="lightboxImg" alt="Illustration"><div class="cap" id="lightboxCap"></div></div>
+<input type="file" id="fileInput" accept="image/*" style="display:none">
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* =================== CONFIGURATION =================== */
+const SUPABASE_URL = "https://lsrnrrfvwichyfaiibld.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxzcm5ycmZ2d2ljaHlmYWlpYmxkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNTU1MTksImV4cCI6MjA5NjczMTUxOX0.H4a1UUANW5MHVMWHo4aU-1FMG6mDYXnKXjUtEyNuXvg";
+const BUCKET = "illustrations";
+/* ===================================================== */
+
+const configured = SUPABASE_URL.startsWith("http");
+if (!configured) {
+  document.getElementById("setupNotice").style.display = "flex";
+}
+
+const sb = configured ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+let channels = [];
+let products = [];
+let currentUser = null;
+let authMode = "login";          // 'login' | 'signup'
+let editingProductId = null;     // null = adding
+let editingChannelId = null;
+let uploadTargetId = null;       // product id awaiting file pick
+let presetChannelId = null;      // channel preselected when adding from a section
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => (s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+/* =================== AUTH =================== */
+function setAuthMsg(text, kind) {
+  const m = $("authMsg");
+  m.textContent = text || "";
+  m.className = "auth-msg" + (text ? " " + kind : "");
+}
+
+function switchAuthMode() {
+  authMode = authMode === "login" ? "signup" : "login";
+  $("authSubmit").textContent = authMode === "login" ? "Log in" : "Create account";
+  $("authToggle").innerHTML = authMode === "login"
+    ? 'No account yet? <a id="authSwitch">Sign up</a>'
+    : 'Already have an account? <a id="authSwitch">Log in</a>';
+  $("authSwitch").onclick = switchAuthMode;
+  setAuthMsg("");
+}
+
+async function handleAuth(e) {
+  e.preventDefault();
+  const email = $("authEmail").value.trim();
+  const password = $("authPass").value;
+  $("authSubmit").disabled = true;
+  setAuthMsg("");
+  try {
+    if (authMode === "signup") {
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) throw error;
+      if (data.session) {
+        await enterApp(data.session.user);
+      } else {
+        setAuthMsg("Account created! Check your email inbox and click the confirmation link, then log in here.", "info");
+        switchAuthMode();
+      }
+    } else {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      await enterApp(data.user);
+    }
+  } catch (err) {
+    setAuthMsg(err.message || "Something went wrong", "error");
+  } finally {
+    $("authSubmit").disabled = false;
+  }
+}
+
+async function enterApp(user) {
+  currentUser = user;
+  $("authScreen").style.display = "none";
+  $("appScreen").style.display = "block";
+  $("userChip").textContent = user.email;
+  await loadAll();
+  subscribeRealtime();
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+/* =================== DATA =================== */
+async function loadAll() {
+  const [chRes, prRes] = await Promise.all([
+    sb.from("channels").select("*").order("name"),
+    sb.from("products").select("*").order("created_at", { ascending: true }),
+  ]);
+  if (chRes.error) { toast("Could not load channels: " + chRes.error.message); return; }
+  if (prRes.error) { toast("Could not load products: " + prRes.error.message); return; }
+  channels = chRes.data;
+  products = prRes.data;
+  render();
+}
+
+let rtChannel = null;
+function subscribeRealtime() {
+  if (rtChannel) return;
+  rtChannel = sb.channel("grid-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => loadAll())
+    .on("postgres_changes", { event: "*", schema: "public", table: "channels" }, () => loadAll())
+    .subscribe();
+}
+
+function publicUrl(path) {
+  return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+/* =================== RENDER =================== */
+function render() {
+  const root = $("gridRoot");
+  const q = $("searchBox").value.trim().toLowerCase();
+  const filterCh = $("channelFilter").value;
+
+  // keep filter dropdowns in sync
+  const filterSel = $("channelFilter");
+  const prevFilter = filterSel.value;
+  filterSel.innerHTML = '<option value="">All channels</option>' +
+    channels.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  filterSel.value = prevFilter;
+
+  if (channels.length === 0) {
+    root.innerHTML = `<div class="empty-state"><div class="big">🚦</div>
+      <p>No channels yet. Click <b>＋ Channel</b> to create your first channel (e.g. Amazon, Retail, D2C).</p></div>`;
+    return;
+  }
+
+  const visibleChannels = filterCh ? channels.filter((c) => c.id === filterCh) : channels;
+
+  root.innerHTML = visibleChannels.map((ch) => {
+    let items = products.filter((p) => p.channel_id === ch.id);
+    if (q) {
+      items = items.filter((p) =>
+        [p.name, p.product_range, p.sku, p.notes].some((v) => (v || "").toLowerCase().includes(q)));
+    }
+    const all = products.filter((p) => p.channel_id === ch.id);
+    const counts = { red: 0, yellow: 0, green: 0 };
+    all.forEach((p) => counts[p.status]++);
+
+    const cardsHtml = items.length
+      ? items.map(cardHtml).join("")
+      : `<div style="color:var(--muted);font-size:13.5px;padding:6px 2px;">${q ? "No matching products." : "No products yet in this channel."}</div>`;
+
+    return `<section class="channel-section">
+      <div class="channel-head">
+        <h2>${esc(ch.name)}</h2>
+        <div class="channel-counts">
+          <span><span class="count-dot" style="background:var(--red)"></span><b>${counts.red}</b> not started</span>
+          <span><span class="count-dot" style="background:var(--yellow)"></span><b>${counts.yellow}</b> started</span>
+          <span><span class="count-dot" style="background:var(--green)"></span><b>${counts.green}</b> done</span>
+        </div>
+        <div class="grow"></div>
+        <button class="ghost" onclick="openProductModal(null, '${ch.id}')">＋ Product</button>
+        <button class="icon-btn" title="Rename channel" onclick="openChannelModal('${ch.id}')">✏️</button>
+        <button class="icon-btn" title="Delete channel" onclick="deleteChannel('${ch.id}')">🗑️</button>
+      </div>
+      <div class="cards">${cardsHtml}</div>
+    </section>`;
+  }).join("");
+}
+
+function cardHtml(p) {
+  const statusText = { red: "Not started", yellow: "Started", green: "Illustration ready" }[p.status];
+  const thumb = p.illustration_path
+    ? `<div class="thumb" onclick="openLightbox('${p.id}')" title="Click to view full size">
+         <img src="${esc(publicUrl(p.illustration_path))}" alt="Illustration" loading="lazy"></div>`
+    : `<div class="thumb" onclick="pickFile('${p.id}')" title="Click to upload illustration">
+         <div class="placeholder"><span class="ph-ic">🖼️</span><span>No illustration yet — click to upload</span></div></div>`;
+
+  const metaBits = [];
+  if (p.product_range) metaBits.push(`<b>Range:</b> ${esc(p.product_range)}`);
+  if (p.sku) metaBits.push(`<b>SKU:</b> ${esc(p.sku)}`);
+
+  return `<div class="card">
+    ${thumb}
+    <div class="card-body">
+      <div class="card-info">
+        <div class="pname">${esc(p.name)}</div>
+        <div class="meta">${metaBits.join("<br>")}</div>
+      </div>
+      <div class="tlight" title="Status: ${statusText}">
+        <button class="t-red ${p.status === "red" ? "lit" : ""}" title="Mark: Not started" onclick="setStatus('${p.id}','red')"></button>
+        <button class="t-yellow ${p.status === "yellow" ? "lit" : ""}" title="Mark: Started" onclick="setStatus('${p.id}','yellow')"></button>
+        <button class="t-green ${p.status === "green" ? "lit" : ""}" title="Green = illustration uploaded" onclick="setStatus('${p.id}','green')"></button>
+      </div>
+    </div>
+    ${p.notes ? `<div class="card-notes">📝 ${esc(p.notes)}</div>` : ""}
+    <div class="status-label ${p.status}">● ${statusText}</div>
+    <div class="card-actions">
+      <button class="upload-btn" onclick="pickFile('${p.id}')">${p.illustration_path ? "Replace illustration" : "⬆ Upload illustration"}</button>
+      ${p.illustration_path ? `<button class="danger-link" onclick="removeIllustration('${p.id}')">Remove</button>` : ""}
+      <div class="right">
+        <button class="icon-btn" title="Edit product" onclick="openProductModal('${p.id}')">✏️</button>
+        <button class="icon-btn" title="Delete product" onclick="deleteProduct('${p.id}')">🗑️</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* =================== STATUS =================== */
+async function setStatus(id, status) {
+  const p = products.find((x) => x.id === id);
+  if (!p || p.status === status) return;
+  if (status === "green" && !p.illustration_path) {
+    toast("Upload the illustration to turn it green ✅");
+    return;
+  }
+  const prev = p.status;
+  p.status = status;
+  render();
+  const { error } = await sb.from("products").update({ status }).eq("id", id);
+  if (error) { p.status = prev; render(); toast("Update failed: " + error.message); }
+}
+
+/* =================== UPLOAD =================== */
+function pickFile(productId) {
+  uploadTargetId = productId;
+  $("fileInput").value = "";
+  $("fileInput").click();
+}
+
+async function handleFile() {
+  const file = $("fileInput").files[0];
+  if (!file || !uploadTargetId) return;
+  const p = products.find((x) => x.id === uploadTargetId);
+  if (!p) return;
+  if (file.size > 15 * 1024 * 1024) { toast("Image too large (max 15 MB)"); return; }
+
+  toast("Uploading illustration…");
+  const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+  const path = `${p.id}/${Date.now()}.${ext}`;
+
+  const { error: upErr } = await sb.storage.from(BUCKET).upload(path, file, { upsert: true });
+  if (upErr) { toast("Upload failed: " + upErr.message); return; }
+
+  const oldPath = p.illustration_path;
+  const { error: dbErr } = await sb.from("products")
+    .update({ illustration_path: path, status: "green" }).eq("id", p.id);
+  if (dbErr) { toast("Save failed: " + dbErr.message); return; }
+
+  if (oldPath) await sb.storage.from(BUCKET).remove([oldPath]);
+  p.illustration_path = path;
+  p.status = "green";
+  render();
+  toast("Illustration uploaded — status is GREEN 🟢");
+}
+
+async function removeIllustration(id) {
+  const p = products.find((x) => x.id === id);
+  if (!p || !p.illustration_path) return;
+  if (!confirm(`Remove the illustration for "${p.name}"? Status will go back to yellow.`)) return;
+  const oldPath = p.illustration_path;
+  const { error } = await sb.from("products")
+    .update({ illustration_path: null, status: "yellow" }).eq("id", id);
+  if (error) { toast("Failed: " + error.message); return; }
+  await sb.storage.from(BUCKET).remove([oldPath]);
+  p.illustration_path = null;
+  p.status = "yellow";
+  render();
+}
+
+/* =================== LIGHTBOX =================== */
+function openLightbox(id) {
+  const p = products.find((x) => x.id === id);
+  if (!p || !p.illustration_path) return;
+  $("lightboxImg").src = publicUrl(p.illustration_path);
+  $("lightboxCap").textContent = p.name + (p.sku ? " · " + p.sku : "");
+  $("lightbox").classList.add("open");
+}
+$("lightbox").onclick = () => $("lightbox").classList.remove("open");
+
+/* =================== PRODUCT CRUD =================== */
+function openProductModal(productId, channelId) {
+  editingProductId = productId;
+  presetChannelId = channelId || null;
+  const p = productId ? products.find((x) => x.id === productId) : null;
+  $("productModalTitle").textContent = p ? "Edit product" : "Add product";
+  $("pfChannel").innerHTML = channels.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  $("pfChannel").value = p ? p.channel_id : (presetChannelId || (channels[0] && channels[0].id) || "");
+  $("pfName").value = p ? p.name : "";
+  $("pfRange").value = p ? (p.product_range || "") : "";
+  $("pfSku").value = p ? (p.sku || "") : "";
+  $("pfNotes").value = p ? (p.notes || "") : "";
+  $("productModal").classList.add("open");
+  $("pfName").focus();
+}
+
+async function saveProduct(e) {
+  e.preventDefault();
+  const payload = {
+    channel_id: $("pfChannel").value,
+    name: $("pfName").value.trim(),
+    product_range: $("pfRange").value.trim() || null,
+    sku: $("pfSku").value.trim() || null,
+    notes: $("pfNotes").value.trim() || null,
+  };
+  if (!payload.channel_id) { toast("Create a channel first"); return; }
+  let error;
+  if (editingProductId) {
+    ({ error } = await sb.from("products").update(payload).eq("id", editingProductId));
+  } else {
+    ({ error } = await sb.from("products").insert(payload));
+  }
+  if (error) { toast("Save failed: " + error.message); return; }
+  closeModals();
+  await loadAll();
+  toast(editingProductId ? "Product updated" : "Product added 🔴 (not started)");
+}
+
+async function deleteProduct(id) {
+  const p = products.find((x) => x.id === id);
+  if (!p) return;
+  if (!confirm(`Delete product "${p.name}"? This cannot be undone.`)) return;
+  const oldPath = p.illustration_path;
+  const { error } = await sb.from("products").delete().eq("id", id);
+  if (error) { toast("Delete failed: " + error.message); return; }
+  if (oldPath) await sb.storage.from(BUCKET).remove([oldPath]);
+  await loadAll();
+}
+
+/* =================== CHANNEL CRUD =================== */
+function openChannelModal(channelId) {
+  editingChannelId = channelId || null;
+  const c = channelId ? channels.find((x) => x.id === channelId) : null;
+  $("channelModalTitle").textContent = c ? "Rename channel" : "Add channel";
+  $("cfName").value = c ? c.name : "";
+  $("channelModal").classList.add("open");
+  $("cfName").focus();
+}
+
+async function saveChannel(e) {
+  e.preventDefault();
+  const name = $("cfName").value.trim();
+  if (!name) return;
+  let error;
+  if (editingChannelId) {
+    ({ error } = await sb.from("channels").update({ name }).eq("id", editingChannelId));
+  } else {
+    ({ error } = await sb.from("channels").insert({ name }));
+  }
+  if (error) {
+    toast(error.code === "23505" ? "A channel with that name already exists" : "Save failed: " + error.message);
+    return;
+  }
+  closeModals();
+  await loadAll();
+}
+
+async function deleteChannel(id) {
+  const c = channels.find((x) => x.id === id);
+  if (!c) return;
+  const count = products.filter((p) => p.channel_id === id).length;
+  if (!confirm(`Delete channel "${c.name}"${count ? ` and its ${count} product(s)` : ""}? This cannot be undone.`)) return;
+  const paths = products.filter((p) => p.channel_id === id && p.illustration_path).map((p) => p.illustration_path);
+  const { error } = await sb.from("channels").delete().eq("id", id);
+  if (error) { toast("Delete failed: " + error.message); return; }
+  if (paths.length) await sb.storage.from(BUCKET).remove(paths);
+  await loadAll();
+}
+
+/* =================== WIRING =================== */
+function closeModals() {
+  document.querySelectorAll(".modal-backdrop").forEach((m) => m.classList.remove("open"));
+}
+document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = closeModals));
+document.querySelectorAll(".modal-backdrop").forEach((m) => {
+  m.addEventListener("click", (e) => { if (e.target === m) closeModals(); });
+});
+
+if (configured) {
+  $("authForm").onsubmit = handleAuth;
+  $("authSwitch").onclick = switchAuthMode;
+  $("logoutBtn").onclick = logout;
+  $("addChannelBtn").onclick = () => openChannelModal(null);
+  $("addProductBtn").onclick = () => {
+    if (channels.length === 0) { toast("Create a channel first"); openChannelModal(null); return; }
+    openProductModal(null);
+  };
+  $("productForm").onsubmit = saveProduct;
+  $("channelForm").onsubmit = saveChannel;
+  $("fileInput").onchange = handleFile;
+  $("searchBox").oninput = render;
+  $("channelFilter").onchange = render;
+
+  // restore session if already logged in
+  sb.auth.getSession().then(({ data }) => {
+    if (data.session) enterApp(data.session.user);
+    else $("authScreen").style.display = "flex";
+  });
+}
+</script>
+</body>
+</html>
