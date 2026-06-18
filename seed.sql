@@ -1,159 +1,22 @@
 -- ============================================================
--- Seed: channels + full annual design framework data
--- Run AFTER migrate.sql (or setup.sql), in the Supabase SQL Editor.
--- Channels are skipped if they already exist. Product data is only
--- inserted when the products table is completely empty, so running
--- this twice never duplicates anything.
+-- RESET / fresh-start script for the BTS FY26-27 dashboard
+-- ============================================================
+-- The app now seeds all channels and the full framework dataset
+-- automatically on first login (when the products table is empty).
+--
+-- Run this ONLY if you previously loaded the older data structure
+-- (channels like "Modern Trade", "MT", "ECom") and want to clear it
+-- so the new BTS dashboard can seed itself cleanly.
+--
+-- WARNING: this deletes ALL products and channels. Uploaded
+-- illustrations in storage are not removed by this script.
 -- ============================================================
 
-insert into public.channels (name)
-values ('Modern Trade'), ('General Trade'), ('Ecom – MP'), ('Ecom – OR'), ('Institution')
-on conflict (name) do nothing;
+delete from public.products;
+delete from public.channels;
 
--- Remove the old placeholder channels if they were never used
-delete from public.channels ch
-where ch.name in ('MT', 'ECom')
-  and not exists (select 1 from public.products p where p.channel_id = ch.id);
-
-insert into public.products (channel_id, name, client, assigned_to, status, description, attrs)
-select c.id, v.name, nullif(v.client, ''), nullif(v.assigned, ''), v.status, nullif(v.notes, ''), v.attrs::jsonb
-from (values
-  -- ===== Modern Trade =====
-  ('Modern Trade', 'Hope',                 'Dmart', 'Darshita', 'green', '',              '{"size":"18 Inch","price":"₹299","skus":"8","fabric":"Checks PU"}'),
-  ('Modern Trade', 'Moscow',               'Dmart', 'Darshita', 'green', '',              '{"size":"18 Inch","price":"₹399","skus":"12","fabric":"Checks PU"}'),
-  ('Modern Trade', 'Flite',                'Dmart', '',         'red',   '',              '{"size":"19 Inch","price":"₹499","skus":"6","fabric":"Checks PU"}'),
-  ('Modern Trade', 'Athens',               'Dmart', '',         'red',   '',              '{"size":"19 Inch","price":"₹499","skus":"12","fabric":"Checks PU"}'),
-  ('Modern Trade', 'New York',             'Dmart', '',         'red',   '',              '{"size":"19 Inch","price":"₹599","skus":"12","fabric":"Checks PU"}'),
-  ('Modern Trade', 'Floret',               'Dmart', '',         'red',   '',              '{"size":"19 Inch","price":"₹699","skus":"9","fabric":"1000D PU"}'),
-  ('Modern Trade', 'Streamer',             'Dmart', '',         'red',   '',              '{"size":"19 Inch","price":"₹899","skus":"6","fabric":"1001D PU"}'),
-  ('Modern Trade', 'Oreo',                 'Dmart', 'Shriya',   'green', 'Non Character', '{"size":"14 Inch","price":"₹199","skus":"12","fabric":"3×3 PVC"}'),
-  ('Modern Trade', 'Cupcake',              'Dmart', 'Shriya',   'green', 'Non Character', '{"size":"16 Inch","price":"₹249","skus":"12","fabric":"3×3 PVC"}'),
-  ('Modern Trade', 'Nano',                 'Dmart', '',         'red',   '',              '{"size":"12 Inch","price":"₹299","skus":"68","fabric":"TBD"}'),
-  ('Modern Trade', 'Dazzle',               'Dmart', '',         'red',   '',              '{"size":"14 Inch","price":"₹449","skus":"12","fabric":"TBD"}'),
-  ('Modern Trade', 'Mystique',             'Dmart', '',         'red',   '',              '{"size":"16 Inch","price":"₹549","skus":"12","fabric":"TBD"}'),
-  ('Modern Trade', 'Minion',               'Dmart', '',         'red',   '',              '{"size":"15 Inch","price":"₹499","skus":"12","fabric":"TBD"}'),
-  ('Modern Trade', 'Mischief',             'Dmart', '',         'red',   '',              '{"size":"17 Inch","price":"₹549","skus":"12","fabric":"TBD"}'),
-  ('Modern Trade', 'Funky',                'Dmart', '',         'red',   '',              '{"size":"16 Inch","price":"₹599","skus":"12","fabric":"TBD"}'),
-  ('Modern Trade', 'Nugget',               'Dmart', 'Rahul',    'green', '',              '{"size":"16 Inch","price":"₹699","skus":"6","fabric":"TBD"}'),
-  ('Modern Trade', 'Snappy',               'Dmart', '',         'red',   '',              '{"size":"16 Inch","price":"₹699","skus":"4","fabric":"TBD"}'),
-  ('Modern Trade', 'Aristro',              'Dmart', '',         'red',   '',              '{"size":"18 Inch","price":"₹799","skus":"6","fabric":"TBD"}'),
-  ('Modern Trade', 'Stunner',              'Dmart', '',         'red',   '',              '{"size":"18 Inch","price":"₹799","skus":"6","fabric":"TBD"}'),
-  ('Modern Trade', 'Perry (Printed)',      'Dmart', '',         'red',   '',              '{"size":"18 Inch","price":"₹599","skus":"8","fabric":"TBD"}'),
-  ('Modern Trade', 'Hot',                  'Dmart', '',         'red',   '',              '{"size":"TBD","price":"₹549","skus":"6","fabric":"5×5 PVC"}'),
-  ('Modern Trade', 'Hero',                 'Dmart', '',         'red',   '',              '{"size":"TBD","price":"₹599","skus":"6","fabric":"5×5 PVC"}'),
-  ('Modern Trade', 'Hunt',                 'Dmart', '',         'red',   '',              '{"size":"TBD","price":"₹699","skus":"4","fabric":"5×5 PVC"}'),
-  ('Modern Trade', 'Perry',                'Dmart', '',         'red',   '',              '{"size":"TBD","price":"TBD","skus":"4","fabric":"TBD"}'),
-  ('Modern Trade', 'DF/Wheeler',           'Dmart', '',         'red',   '',              '{"size":"TBD","price":"TBD","fabric":"TBD"}'),
-  ('Modern Trade', 'Shopping Bag',         'Dmart', '',         'red',   '',              '{"size":"TBD","price":"TBD","fabric":"TBD"}'),
-  ('Modern Trade', 'Pouch',                'Dmart', '',         'red',   '',              '{"size":"TBD","price":"TBD","fabric":"TBD"}'),
-  ('Modern Trade', 'Laptop Premium Range', 'Dmart', '',         'red',   '',              '{"size":"TBD","price":"TBD","fabric":"TBD"}'),
-  ('Modern Trade', 'Lunch Bag',            'Dmart', '',         'red',   '',              '{"size":"TBD","price":"TBD","fabric":"TBD"}'),
-  ('Modern Trade', 'Gym Bag',              'Dmart', '',         'red',   '',              '{"size":"TBD","price":"TBD","fabric":"TBD"}'),
-  ('Modern Trade', 'Miniature',            'RIL',   '',         'red',   '',              '{"size":"TBD","price":"₹299","skus":"4","fabric":"TBD"}'),
-  ('Modern Trade', 'Rockstar',             'RIL',   '',         'red',   '',              '{"size":"TBD","price":"₹399","skus":"3","fabric":"TBD"}'),
-  ('Modern Trade', 'Moscow',               'RIL',   '',         'red',   '',              '{"size":"TBD","price":"₹399","skus":"6","fabric":"TBD"}'),
-  ('Modern Trade', 'Athens',               'RIL',   '',         'red',   '',              '{"size":"TBD","price":"₹499","skus":"6","fabric":"TBD"}'),
-  ('Modern Trade', 'New York',             'RIL',   '',         'red',   '',              '{"size":"TBD","price":"₹599","skus":"6","fabric":"TBD"}'),
-  ('Modern Trade', 'Floret',               'RIL',   '',         'red',   '',              '{"size":"TBD","price":"₹699","skus":"3","fabric":"TBD"}'),
-  ('Modern Trade', 'Hope',                 'VMM',   '',         'red',   '',              '{"size":"TBD","price":"₹349","skus":"3","fabric":"TBD"}'),
-  ('Modern Trade', 'Rockstar',             'VMM',   '',         'red',   '',              '{"size":"TBD","price":"₹399","skus":"5","fabric":"TBD"}'),
-  ('Modern Trade', 'Megastar',             'VMM',   '',         'red',   '',              '{"size":"TBD","price":"₹499","skus":"3","fabric":"TBD"}'),
-  ('Modern Trade', 'Dream',                'VMM',   '',         'red',   '',              '{"size":"TBD","price":"₹599","skus":"3","fabric":"TBD"}'),
-  ('Modern Trade', 'Floret',               'VMM',   '',         'red',   '',              '{"size":"TBD","price":"₹699","skus":"3","fabric":"TBD"}'),
-  ('Modern Trade', 'Apex',                 'VMM',   '',         'red',   '',              '{"size":"TBD","price":"₹499","skus":"3","fabric":"TBD"}'),
-  -- ===== General Trade =====
-  ('General Trade', 'Scott',       '', '', 'red', '', '{"category":"College Bag","price":"₹135","skus":"10"}'),
-  ('General Trade', 'Dynamic',     '', '', 'red', '', '{"category":"College Bag","price":"₹225","skus":"6"}'),
-  ('General Trade', 'Glorious',    '', '', 'red', '', '{"category":"College Bag","price":"₹355","skus":"5"}'),
-  ('General Trade', 'Inox',        '', '', 'red', '', '{"category":"College Bag","price":"₹375","skus":"5"}'),
-  ('General Trade', 'Incredible',  '', '', 'red', '', '{"category":"College Bag","price":"₹415","skus":"5"}'),
-  ('General Trade', 'Fabulous',    '', '', 'red', '', '{"category":"College Bag","price":"₹440","skus":"8"}'),
-  ('General Trade', 'Fame',        '', '', 'red', '', '{"category":"College Bag","price":"₹550","skus":"8"}'),
-  ('General Trade', 'Blockbuster', '', '', 'red', '', '{"category":"College Bag","price":"₹560","skus":"8"}'),
-  ('General Trade', 'Century',     '', '', 'red', '', '{"category":"College Bag","price":"₹600","skus":"5"}'),
-  ('General Trade', 'Iconic',      '', '', 'red', '', '{"category":"College Bag","price":"₹675","skus":"8"}'),
-  ('General Trade', 'Dreamer',     '', '', 'red', '', '{"category":"College Bag","price":"₹725","skus":"5"}'),
-  ('General Trade', 'Champion',    '', '', 'red', '', '{"category":"College Bag","price":"₹775","skus":"5"}'),
-  ('General Trade', 'Flite',       '', '', 'red', '', '{"category":"College Bag","price":"TBD","skus":"5"}'),
-  ('General Trade', 'Infinity',    '', '', 'red', '', '{"category":"College Bag","price":"TBD","skus":"5"}'),
-  ('General Trade', 'King',        '', '', 'red', '', '{"category":"College Bag","price":"TBD","skus":"2"}'),
-  ('General Trade', 'Stellar',     '', '', 'red', '', '{"category":"College Bag","price":"TBD","skus":"6"}'),
-  ('General Trade', 'Axis',        '', '', 'red', '', '{"category":"Laptop Bag","price":"₹375","skus":"4"}'),
-  ('General Trade', 'Protech',     '', '', 'red', '', '{"category":"Laptop Bag","price":"₹400","skus":"4"}'),
-  ('General Trade', 'Atlas',       '', '', 'red', '', '{"category":"Laptop Bag","price":"₹415","skus":"4"}'),
-  ('General Trade', 'Node',        '', '', 'red', '', '{"category":"Laptop Bag","price":"₹450","skus":"5"}'),
-  ('General Trade', 'Matrix',      '', '', 'red', '', '{"category":"Laptop Bag","price":"₹550","skus":"4"}'),
-  ('General Trade', 'Xtreme',      '', '', 'red', '', '{"category":"Laptop Bag","price":"₹550","skus":"4"}'),
-  ('General Trade', 'Electra',     '', '', 'red', '', '{"category":"Laptop Bag","price":"₹600","skus":"4"}'),
-  ('General Trade', 'Zipster',     '', '', 'red', '', '{"category":"Laptop Bag","price":"₹650","skus":"4"}'),
-  ('General Trade', 'Oxford',      '', '', 'red', '', '{"category":"Laptop Bag","price":"₹700","skus":"4"}'),
-  ('General Trade', 'Trekker',     '', '', 'red', '', '{"category":"Hiking","price":"TBD","skus":"1"}'),
-  ('General Trade', 'Fortuner',    '', '', 'red', '', '{"category":"Hiking","price":"TBD","skus":"1"}'),
-  ('General Trade', 'Hangover',    '', '', 'red', '', '{"category":"Hiking","price":"TBD","skus":"3"}'),
-  ('General Trade', 'Commando',    '', '', 'red', '', '{"category":"Hiking","price":"TBD","skus":"1"}'),
-  ('General Trade', 'Mount',       '', '', 'red', '', '{"category":"Hiking","price":"TBD","skus":"1"}'),
-  ('General Trade', 'Camp',        '', '', 'red', '', '{"category":"Hiking","price":"TBD","skus":"1"}'),
-  -- ===== Ecom – MP =====
-  ('Ecom – MP', 'Victoria',   '', '', 'red', '', '{"price":"₹140","skus":"5"}'),
-  ('Ecom – MP', 'Proxy',      '', '', 'red', '', '{"price":"₹165","skus":"6"}'),
-  ('Ecom – MP', 'Slay',       '', '', 'red', '', '{"price":"₹170","skus":"5"}'),
-  ('Ecom – MP', 'Aroma',      '', '', 'red', '', '{"price":"₹195","skus":"5"}'),
-  ('Ecom – MP', 'Invicto',    '', '', 'red', '', '{"price":"₹203","skus":"3"}'),
-  ('Ecom – MP', 'I-Pad',      '', '', 'red', '', '{"price":"₹207","skus":"4"}'),
-  ('Ecom – MP', 'Hotspot',    '', '', 'red', '', '{"price":"₹216","skus":"3"}'),
-  ('Ecom – MP', 'Portable',   '', '', 'red', '', '{"price":"₹236","skus":"3"}'),
-  ('Ecom – MP', 'Urbanite',   '', '', 'red', '', '{"price":"₹250","skus":"3"}'),
-  ('Ecom – MP', 'Mamma Bear', '', '', 'red', '', '{"price":"₹260","skus":"3"}'),
-  ('Ecom – MP', 'Canon',      '', '', 'red', '', '{"price":"₹340","skus":"3"}'),
-  ('Ecom – MP', 'Sigma',      '', '', 'red', '', '{"price":"₹342","skus":"3"}'),
-  ('Ecom – MP', 'Drone',      '', '', 'red', '', '{"price":"₹464","skus":"3"}'),
-  ('Ecom – MP', 'Briefcase',  '', '', 'red', '', '{"price":"₹547","skus":"3"}'),
-  -- ===== Ecom – OR =====
-  ('Ecom – OR', 'Overnighters',                        '', '', 'red', '', '{"brand":"Good (Hashtag)","price":"₹700–750","features":"ON + 2 comp with LP","size":"18.5\", 40L","colors":"2"}'),
-  ('Ecom – OR', 'Overnighters',                        '', '', 'red', '', '{"brand":"Priority","price":"₹900–999","features":"ON + LP + expander","size":"20\", 40L","colors":"2"}'),
-  ('Ecom – OR', 'Overnighters',                        '', '', 'red', '', '{"brand":"Priority","price":"₹700","features":"SC + organiser pocket (non LP)","size":"20\", 40L","colors":"2"}'),
-  ('Ecom – OR', 'Overnighters',                        '', '', 'red', '', '{"brand":"Priority","price":"₹1600–1800","features":"SC+RC+3Poc+both side clothes+exp+Lock","size":"21\", 45L","colors":"2"}'),
-  ('Ecom – OR', '3 Comp Laptop',                       '', '', 'red', '', '{"brand":"Priority","price":"₹800","features":"3+3 pocket story","size":"19\", 30–38L","colors":"4"}'),
-  ('Ecom – OR', '3 Comp Laptop',                       '', '', 'red', '', '{"brand":"Priority","price":"₹900–999","features":"3comp + 10 zipper + fake 1680","size":"19\", 38L","colors":"2"}'),
-  ('Ecom – OR', '3 Comp Laptop',                       '', '', 'red', '', '{"brand":"Priority","price":"₹900–999","features":"Vertical with flat opening","size":"19\", 38L","colors":"3"}'),
-  ('Ecom – OR', '3 Comp Laptop',                       '', '', 'red', '', '{"brand":"Priority","price":"₹900–999","features":"3 compt PU backpack","size":"19\", 35–38L","colors":"3"}'),
-  ('Ecom – OR', '3 Comp Laptop',                       '', '', 'red', '', '{"brand":"Good (Hashtag)","price":"₹600","features":"3comp opp","size":"20\", 35–38L","colors":"3"}'),
-  ('Ecom – OR', '2 Comp + Laptop',                     '', '', 'red', '', '{"brand":"Priority","price":"₹699","features":"PU backpack","size":"18\", 30–35L","colors":"3"}'),
-  ('Ecom – OR', '2 Comp + Laptop',                     '', '', 'red', '', '{"brand":"Priority","price":"₹899–999","features":"Antitheft backpack","size":"18\", 30–35L","colors":"3"}'),
-  ('Ecom – OR', '2 Comp + Laptop',                     '', '', 'red', '', '{"brand":"Priority","price":"₹899–999","features":"1680 + No10 zipper","size":"18.5\", 30–35L","colors":"3"}'),
-  ('Ecom – OR', '2 Comp + Laptop',                     '', '', 'red', '', '{"brand":"Priority","price":"₹1100–1200","features":"Structured backpack – Mokobara style","size":"19\", 30–35L","colors":"3"}'),
-  ('Ecom – OR', '2 Comp + Laptop',                     '', '', 'red', '', '{"brand":"Good (Hashtag)","price":"₹499–550","features":"2comp opp – 450 billing","size":"18\", 30–32L","colors":"5"}'),
-  ('Ecom – OR', '2 Comp + Laptop',                     '', '', 'red', '', '{"brand":"Good (Hashtag)","price":"₹550","features":"2comp","size":"35L","colors":"4"}'),
-  ('Ecom – OR', 'Daypack',                             '', '', 'red', '', '{"brand":"Priority","price":"₹199–249","features":"Existing 10L BP","size":"10\", 10–15L","colors":"5"}'),
-  ('Ecom – OR', 'Daypack',                             '', '', 'red', '', '{"brand":"Priority","price":"₹499","features":"1 comp Laptop","size":"15\", 18L","colors":"3"}'),
-  ('Ecom – OR', 'Daypack',                             '', '', 'red', '', '{"brand":"Priority","price":"₹499","features":"1+1 pocket casual non LP","size":"18\", 18L","colors":"4"}'),
-  ('Ecom – OR', 'Daypack',                             '', '', 'red', '', '{"brand":"Priority","price":"₹499","features":"1+1 comp formal non laptop","size":"18\", 18L","colors":"4"}'),
-  ('Ecom – OR', 'Daypack',                             '', '', 'red', '', '{"brand":"Priority","price":"₹499","features":"1+1 comp womens","size":"18L"}'),
-  ('Ecom – OR', 'Daypack',                             '', '', 'red', '', '{"brand":"Good (Hashtag)","price":"₹350–399","features":"1 comp laptop","size":"18L","colors":"4"}'),
-  ('Ecom – OR', 'Hiking Backpack',                     '', '', 'red', '', '{"brand":"Priority","price":"₹899–999","features":"3 comp not top loading shoe pouch","size":"21\"h, 45L","colors":"2"}'),
-  ('Ecom – OR', 'Hiking Backpack',                     '', '', 'red', '', '{"brand":"Priority","price":"₹999","features":"Top loading like Fortuner","size":"45L","colors":"2"}'),
-  ('Ecom – OR', 'Hiking Backpack',                     '', '', 'red', '', '{"brand":"Priority","price":"₹1200","size":"55L","colors":"2"}'),
-  ('Ecom – OR', 'Hiking Backpack',                     '', '', 'red', '', '{"brand":"Good (Hashtag)","price":"₹700","features":"3 compartment Wesley style","size":"45L","colors":"4"}'),
-  ('Ecom – OR', 'Girls Backpack',                      '', '', 'red', '', '{"brand":"Priority","price":"₹599–799","features":"Girls 3 comp secondary","size":"35L","colors":"5"}'),
-  ('Ecom – OR', 'Girls Backpack',                      '', '', 'red', '', '{"brand":"Priority","price":"₹499–599","features":"Girls 3 comp primary","size":"30L","colors":"5"}'),
-  ('Ecom – OR', 'Girls Backpack',                      '', '', 'red', '', '{"brand":"Priority","price":"₹399–499","features":"Girls pre-primary","size":"20L","colors":"5"}'),
-  ('Ecom – OR', 'Girls Backpack',                      '', '', 'red', '', '{"brand":"Good (Hashtag)","price":"₹450–500","features":"3 comp basic","size":"32L","colors":"5"}'),
-  ('Ecom – OR', 'College Casual',                      '', '', 'red', '', '{"brand":"Priority","price":"₹499–699","features":"2 comp non laptop","size":"18\", 22–25L","colors":"5"}'),
-  ('Ecom – OR', 'School – 3 Comp Boys Secondary',      '', '', 'red', '', '{"brand":"Priority","price":"₹599","features":"3comp","size":"19–20\", 35–40L","colors":"6"}'),
-  ('Ecom – OR', 'School – 3 Comp Boys + RC Secondary', '', '', 'red', '', '{"brand":"Priority","price":"₹699","features":"3comp","size":"19–20\", 35–40L","colors":"6"}'),
-  ('Ecom – OR', 'School – 3 Comp Boys RC+LP Secondary','', '', 'red', '', '{"brand":"Priority","price":"₹799","features":"3comp","size":"19–20\", 35–40L","colors":"6"}'),
-  ('Ecom – OR', 'School Primary',                      '', '', 'red', '', '{"brand":"Priority","price":"₹400–600","features":"3comp","size":"17\"","colors":"6"}'),
-  ('Ecom – OR', 'School Pre-Primary',                  '', '', 'red', '', '{"brand":"Priority","price":"₹500","features":"2comp","colors":"8"}'),
-  ('Ecom – OR', 'School Primary',                      '', '', 'red', '', '{"brand":"Good (Hashtag)","price":"TBD","features":"2comp + charms + toy"}'),
-  -- ===== Institution =====
-  ('Institution', 'D Bag',         '', '', 'red', '', '{"subchannel":"Insti – Ayyappan","price":"TBD"}'),
-  ('Institution', 'Wheeler',       '', '', 'red', '', '{"subchannel":"Insti – Ayyappan","price":"TBD"}'),
-  ('Institution', 'DFT',           '', '', 'red', '', '{"subchannel":"Insti – Ayyappan","price":"TBD"}'),
-  ('Institution', 'Laptop Sleeve', '', '', 'red', '', '{"subchannel":"Insti – Ayyappan","price":"TBD"}'),
-  ('Institution', 'Shopping Bag',  '', '', 'red', '', '{"subchannel":"Insti – Ayyappan","price":"TBD"}'),
-  ('Institution', 'Sling Bag',     '', '', 'red', '', '{"subchannel":"Insti – Ayyappan","price":"TBD"}'),
-  ('Institution', 'Cross Body',    '', '', 'red', '', '{"subchannel":"Insti – Ayyappan","price":"TBD"}'),
-  ('Institution', 'Pouch',         '', '', 'red', '', '{"subchannel":"Insti – Ayyappan","price":"TBD"}')
-) as v(channel, name, client, assigned, status, notes, attrs)
-join public.channels c on c.name = v.channel
-where not exists (select 1 from public.products);
+-- After running this, just refresh the app and log in — it will
+-- recreate the 7 channels (MT — Dmart, MT — Reliance, MT — VMM,
+-- General Trade, Ecom — MP, Ecom — OR, Institution) and load all
+-- ~130 articles with their ranges, SKUs, print/plain split,
+-- fabrics, ideation themes, designers and statuses.
