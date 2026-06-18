@@ -1078,13 +1078,14 @@ function refreshAll(){
   const eor = renderEcomOR();
   const ins = renderInsti();
 
-  // Overview KPI = grand total across EVERY channel (incl. Ecom — OR),
-  // so the headline figures match the master dashboard. Each other tab's
-  // KPI reflects just that tab's filtered rows.
+  // The two cross-channel summary tabs (Overview & Design Ideation) show the
+  // grand total across EVERY channel (incl. Ecom — OR), matching the master
+  // dashboard. Each individual channel tab's KPI reflects just its own rows.
   const globalRows = [...dm, ...rl, ...vm, ...gt, ...emp, ...eor, ...ins];
   const tabRows = {
     overview: globalRows,
-    ideation: id, dmart: dm, reliance: rl, vmm: vm, gt: gt,
+    ideation: globalRows,
+    dmart: dm, reliance: rl, vmm: vm, gt: gt,
     "ecom-mp": emp, "ecom-or": eor, insti: ins,
   };
   _visibleRows = tabRows[activeTab] || globalRows;
