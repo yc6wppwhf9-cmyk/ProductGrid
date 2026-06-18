@@ -561,6 +561,7 @@ let channelRows = [];           // raw channel records {id,name}
 let channelIdByName = {};
 let currentUser = null;
 let authMode = "login";
+let activeTab = "overview";   // which tab the KPI bar reflects
 
 const $ = (id) => document.getElementById(id);
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),2600);}
@@ -851,8 +852,10 @@ $("lightbox").onclick=()=>$("lightbox").classList.remove("open");
 
 /* =================== TABS =================== */
 function switchTab(id){
+  activeTab=id;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===id));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+id));
+  refreshAll(); // recompute KPIs for the newly-active tab
 }
 
 /* =================== KPI =================== */
@@ -898,6 +901,7 @@ function renderOverview(){
       <div class="gcell">${editBtn(r.id)}</div>
     </div>`).join(''):empty();
   $("tb-overview").textContent=rows.length;
+  return rows;
 }
 
 function renderIdeation(){
@@ -917,6 +921,7 @@ function renderIdeation(){
       <div class="sku-row">${printBadge(r.print||0,r.plain||0)} <span style="font-size:11px;color:var(--text2);margin-left:4px">${r.sku||0} SKUs</span></div>
     </div>`).join(''):`<div class="empty" style="grid-column:1/-1">No ideation data matches the filters.</div>`;
   $("tb-ideation").textContent=rows.length;
+  return rows;
 }
 
 function renderDmart(){
@@ -926,7 +931,7 @@ function renderDmart(){
   popSel('dm-f-des',unique(s1.map(x=>x.assigned).filter(x=>x&&x!=='TBD')),fdes);
   const rows=ptypeFilter(s1.filter(r=>(!fdes||r.assigned===fdes)&&(!fst||r.status===fst)&&(!fs||r.product.toLowerCase().includes(fs))),fpt);
   const el=$("dm-sections");
-  if(!rows.length){el.innerHTML=empty();$("tb-dmart").textContent=0;return;}
+  if(!rows.length){el.innerHTML=empty();$("tb-dmart").textContent=0;return [];}
   const ranges=unique(rows.map(x=>x.range));
   el.innerHTML=ranges.map(rng=>{
     const sub=rows.filter(x=>x.range===rng);
@@ -949,6 +954,7 @@ function renderDmart(){
     </div>`).join('');
   }).join('');
   $("tb-dmart").textContent=rows.length;
+  return rows;
 }
 
 function renderSimpleMT(arr,pre,gridId,badgeId){
@@ -967,9 +973,10 @@ function renderSimpleMT(arr,pre,gridId,badgeId){
       <div class="gcell">${editBtn(r.id)}</div>
     </div>`).join(''):empty();
   $(badgeId).textContent=rows.length;
+  return rows.map(x=>({...x,print:0,plain:x.sku||0,kids:false,exclusive:false}));
 }
-function renderReliance(){renderSimpleMT(RELIANCE,'rl','rl-grid','tb-reliance');}
-function renderVMM(){renderSimpleMT(VMM,'vmm','vmm-grid','tb-vmm');}
+function renderReliance(){return renderSimpleMT(RELIANCE,'rl','rl-grid','tb-reliance');}
+function renderVMM(){return renderSimpleMT(VMM,'vmm','vmm-grid','tb-vmm');}
 
 function renderGT(){
   const fcat=gv('gt-f-cat'),fdes=gv('gt-f-des'),fst=gv('gt-f-status'),fpt=gv('gt-f-ptype'),fs=gv('gt-f-search').toLowerCase();
@@ -991,6 +998,7 @@ function renderGT(){
       <div class="gcell">${editBtn(r.id)}</div>
     </div>`).join(''):empty();
   $("tb-gt").textContent=rows.length;
+  return rows;
 }
 
 function renderEcomMP(){
@@ -1009,6 +1017,7 @@ function renderEcomMP(){
       <div class="gcell">${editBtn(r.id)}</div>
     </div>`).join(''):empty();
   $("tb-ecom-mp").textContent=rows.length;
+  return rows.map(x=>({...x,print:0,plain:x.sku||0,kids:false,exclusive:false}));
 }
 
 function renderEcomOR(){
@@ -1030,6 +1039,7 @@ function renderEcomOR(){
       <div class="gcell">${editBtn(r.id)}</div>
     </div>`).join(''):empty();
   $("tb-ecom-or").textContent=rows.length;
+  return rows.map(x=>({...x,sku:x.colors||0,print:0,plain:x.colors||0,kids:false,exclusive:false}));
 }
 
 function renderInsti(){
@@ -1045,6 +1055,7 @@ function renderInsti(){
       <div class="gcell">${editBtn(r.id)}</div>
     </div>`).join(''):empty();
   $("tb-insti").textContent=rows.length;
+  return rows.map(x=>({...x,sku:0,print:0,plain:0,kids:false,exclusive:false}));
 }
 
 function resetF(pre){
@@ -1053,31 +1064,22 @@ function resetF(pre){
 }
 
 /* =================== REFRESH ALL =================== */
-// KPIs are computed from EVERY channel's currently-filtered rows, so they
-// always reflect what the filters (and any status changes) are showing.
+// Every tab renders and returns its currently-filtered (KPI-normalised) rows.
+// The KPI bar then reflects whichever tab you're viewing, honouring that
+// tab's own filters — and updates after any inline status/assignee change.
 function refreshAll(){
-  renderOverview(); renderIdeation();
-  renderDmart(); renderReliance(); renderVMM(); renderGT(); renderEcomMP(); renderEcomOR(); renderInsti();
-
-  const fpt=gv('ov-f-ptype'); // overview print-type also bounds the KPI view when set
-  const kpiRows=[
-    ...DMART.map(x=>({...x,channel:'MT — Dmart'})),
-    ...RELIANCE.map(x=>({...x,channel:'MT — Reliance',print:0,plain:x.sku||0,kids:false,exclusive:false})),
-    ...VMM.map(x=>({...x,channel:'MT — VMM',print:0,plain:x.sku||0,kids:false,exclusive:false})),
-    ...GT.map(x=>({...x,channel:'General Trade'})),
-    ...ECOM_MP.map(x=>({...x,channel:'Ecom — MP',print:0,plain:x.sku||0,kids:false,exclusive:false})),
-    ...ECOM_OR.map(x=>({...x,channel:'Ecom — OR',sku:x.colors||0,print:0,plain:x.colors||0,kids:false,exclusive:false})),
-    ...INSTI.map(x=>({...x,channel:'Institution',sku:0,print:0,plain:0,kids:false,exclusive:false})),
-  ];
-  // apply the Overview filters to the KPI set so KPIs track the active view
-  const fch=gv('ov-f-ch'),fdes=gv('ov-f-des'),fst=gv('ov-f-status'),fs=gv('ov-f-search').toLowerCase();
-  let rows=kpiRows;
-  if(fch)  rows=rows.filter(r=>r.channel===fch);
-  if(fdes) rows=rows.filter(r=>r.assigned===fdes);
-  if(fst)  rows=rows.filter(r=>r.status===fst);
-  if(fs)   rows=rows.filter(r=>(r.product||r.category||'').toLowerCase().includes(fs));
-  rows=ptypeFilter(rows,fpt);
-  _visibleRows=rows;
+  const tabRows = {
+    overview: renderOverview(),
+    ideation: renderIdeation(),
+    dmart:    renderDmart(),
+    reliance: renderReliance(),
+    vmm:      renderVMM(),
+    gt:       renderGT(),
+    "ecom-mp":renderEcomMP(),
+    "ecom-or":renderEcomOR(),
+    insti:    renderInsti(),
+  };
+  _visibleRows = tabRows[activeTab] || tabRows.overview || [];
   updateKPI();
 }
 
