@@ -1068,18 +1068,26 @@ function resetF(pre){
 // The KPI bar then reflects whichever tab you're viewing, honouring that
 // tab's own filters — and updates after any inline status/assignee change.
 function refreshAll(){
+  renderOverview(); // renders the Overview grid (its own row set)
+  const id  = renderIdeation();
+  const dm  = renderDmart();
+  const rl  = renderReliance();
+  const vm  = renderVMM();
+  const gt  = renderGT();
+  const emp = renderEcomMP();
+  const eor = renderEcomOR();
+  const ins = renderInsti();
+
+  // Overview KPI = grand total across EVERY channel (incl. Ecom — OR),
+  // so the headline figures match the master dashboard. Each other tab's
+  // KPI reflects just that tab's filtered rows.
+  const globalRows = [...dm, ...rl, ...vm, ...gt, ...emp, ...eor, ...ins];
   const tabRows = {
-    overview: renderOverview(),
-    ideation: renderIdeation(),
-    dmart:    renderDmart(),
-    reliance: renderReliance(),
-    vmm:      renderVMM(),
-    gt:       renderGT(),
-    "ecom-mp":renderEcomMP(),
-    "ecom-or":renderEcomOR(),
-    insti:    renderInsti(),
+    overview: globalRows,
+    ideation: id, dmart: dm, reliance: rl, vmm: vm, gt: gt,
+    "ecom-mp": emp, "ecom-or": eor, insti: ins,
   };
-  _visibleRows = tabRows[activeTab] || tabRows.overview || [];
+  _visibleRows = tabRows[activeTab] || globalRows;
   updateKPI();
 }
 
