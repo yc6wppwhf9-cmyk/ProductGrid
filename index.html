@@ -621,9 +621,11 @@ async function loadAll(){
   await ensureChannels();
   let {data:prods,error} = await sb.from("products").select("*").order("created_at",{ascending:true});
   if(error){ toast("Load failed: "+error.message); return; }
-  // Sample-data auto-seed disabled — the grid starts empty so you add your own
-  // articles via "＋ New Product". (To reload the demo data, call seedDatabase()
-  // from the console, or run seed steps manually.)
+  // Seed the full framework dataset on first load (only when the table is empty)
+  if(!prods || prods.length===0){
+    await seedDatabase();
+    ({data:prods} = await sb.from("products").select("*").order("created_at",{ascending:true}));
+  }
   // group rows back into the per-channel arrays the renderers expect
   DMART=[];RELIANCE=[];VMM=[];GT=[];ECOM_MP=[];ECOM_OR=[];INSTI=[];
   const idToName={}; channelRows.forEach(c=>idToName[c.id]=c.name);
