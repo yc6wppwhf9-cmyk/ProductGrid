@@ -380,8 +380,8 @@ button{font-family:inherit}input,select,textarea{font-family:inherit}
     <div class="fg"><label>Print Type</label><select id="gt-f-ptype" onchange="refreshAll()"><option value="">All</option><option value="print">Print Only</option><option value="plain">Plain Only</option></select></div>
     <button class="btn-reset" onclick="resetF('gt')">Reset</button>
   </div>
-  <div class="ghdr" style="grid-template-columns:2fr 1fr 0.8fr 0.6fr 0.7fr 0.7fr 1.2fr 1.1fr 0.9fr 70px">
-    <span>Article</span><span>Category</span><span>Fabric</span><span>Price</span><span>SKUs</span><span>Print</span><span>Assigned</span><span>Status</span><span>Illustration</span><span>Edit</span>
+  <div class="ghdr" style="grid-template-columns:1.8fr 1fr 0.8fr 0.6fr 0.6fr 0.6fr 1fr 1fr 1.4fr 0.8fr 66px">
+    <span>Article</span><span>Category</span><span>Fabric</span><span>Price</span><span>SKUs</span><span>Print</span><span>Assigned</span><span>Status</span><span>Deadline</span><span>Illustration</span><span>Edit</span>
   </div>
   <div id="gt-grid"></div>
 </div>
@@ -465,6 +465,7 @@ button{font-family:inherit}input,select,textarea{font-family:inherit}
       </div>
       <input type="file" id="m-file" accept="image/*" style="display:none" onchange="handleUpload(event)"/>
     </div>
+    <div class="mf"><label>Deadline</label><input type="text" id="m-deadline" placeholder="e.g. 15-07-2026 — With Print & Techpack"/></div>
     <div class="mf"><label>Design Notes</label><input type="text" id="m-notes" placeholder="Any notes on this design…"/></div>
     <div class="m-actions">
       <button class="btn-del" id="m-delete" onclick="deleteEntry()" style="display:none">Delete</button>
@@ -537,15 +538,15 @@ const ADD_FIELDS = {
     {k:"range",label:"Range",type:"select",opts:["College Bag","School Bag","Laptop Bag","Additional"]},
     {k:"size",label:"Size"},{k:"price",label:"Price"},{k:"sku",label:"No. of SKUs",num:true},
     {k:"print",label:"Print SKUs",num:true},{k:"plain",label:"Plain SKUs",num:true},
-    {k:"fabric",label:"Fabric"},{k:"bom",label:"Target BOM"},
+    {k:"fabric",label:"Fabric"},{k:"bom",label:"Target BOM"},{k:"deadline",label:"Deadline"},
     {k:"kids",label:"Kids / Character",type:"bool"},{k:"exclusive",label:"Exclusive",type:"bool"},
   ],
   "MT — Reliance": [{k:"sno",label:"S.No",num:true},{k:"price",label:"Price"},{k:"sku",label:"No. of SKUs",num:true}],
   "MT — VMM":      [{k:"sno",label:"S.No",num:true},{k:"price",label:"Price"},{k:"sku",label:"No. of SKUs",num:true}],
   "General Trade": [
-    {k:"category",label:"Category",type:"select",opts:["College Bag","Laptop Bag","Hiking"]},
+    {k:"category",label:"Category",type:"select",opts:["College Bag","Laptop Bag","Hiking","School Backpack"]},
     {k:"price",label:"Price"},{k:"sku",label:"No. of SKUs",num:true},
-    {k:"print",label:"Print SKUs",num:true},{k:"plain",label:"Plain SKUs",num:true},{k:"fabric",label:"Fabric"},
+    {k:"print",label:"Print SKUs",num:true},{k:"plain",label:"Plain SKUs",num:true},{k:"fabric",label:"Fabric"},{k:"deadline",label:"Deadline"},
   ],
   "Ecom — MP": [{k:"price",label:"Price"},{k:"sku",label:"No. of SKUs",num:true}],
   "Ecom — OR": [
@@ -633,7 +634,7 @@ async function loadAll(){
   (prods||[]).forEach(p=>{
     const chName=idToName[p.channel_id]; const key=CHANNELS[chName];
     const row={...(p.attrs||{}), id:p.id, assigned:p.assigned_to||"TBD", status:TO_UI[p.status]||"To Do",
-               img:publicUrl(p.illustration_path), _path:p.illustration_path||"", notes:p.description||""};
+               img:publicUrl(p.illustration_path), _path:p.illustration_path||"", notes:p.description||"", _attrs:(p.attrs||{})};
     if(key==="dmart")DMART.push(row);
     else if(key==="reliance")RELIANCE.push(row);
     else if(key==="vmm")VMM.push(row);
@@ -738,6 +739,7 @@ function openModal(id){
   $("modal-title").textContent=e.product||e.category||'Edit Entry';
   $("m-assigned").value=e.assigned||'TBD';
   $("m-status").value=e.status||'To Do';
+  $("m-deadline").value=e.deadline||'';
   $("m-notes").value=e.notes||'';
   $("m-upload-hint").textContent=e.img?"Click to replace image":"Click to upload (JPG / PNG)";
   $("m-preview").innerHTML=e.img?`<img class="preview-img" src="${e.img}"/>`:'';
@@ -756,8 +758,11 @@ async function saveModal(){
   const e=findEntry(activeId); if(!e)return;
   $("m-save").disabled=true;
   try{
+    const newDeadline=$("m-deadline").value.trim();
     const upd={ assigned_to: $("m-assigned").value==='TBD'?null:$("m-assigned").value,
-                status: TO_DB[$("m-status").value], description: $("m-notes").value.trim()||null };
+                status: TO_DB[$("m-status").value], description: $("m-notes").value.trim()||null,
+                attrs: {...(e._attrs||{}), deadline: newDeadline||undefined} };
+    if(!newDeadline) delete upd.attrs.deadline;
     if(pendingFile){
       const ext=(pendingFile.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'')||'png';
       const path=`${activeId}/${Date.now()}.${ext}`;
@@ -936,19 +941,20 @@ function renderDmart(){
   el.innerHTML=ranges.map(rng=>{
     const sub=rows.filter(x=>x.range===rng);
     return `<div class="sec-lbl">${rng} — ${sub.reduce((a,x)=>a+(x.sku||0),0)} SKUs</div>
-    <div class="ghdr" style="grid-template-columns:2fr 0.7fr 0.8fr 0.7fr 0.7fr 0.7fr 0.7fr 1.2fr 1.1fr 0.9fr 70px">
-      <span>Article</span><span>Size</span><span>Fabric</span><span>BOM</span><span>Price</span><span>SKUs</span><span>Print</span><span>Assigned</span><span>Status</span><span>Illustration</span><span>Edit</span>
+    <div class="ghdr" style="grid-template-columns:1.8fr 0.6fr 0.8fr 0.6fr 0.6fr 0.5fr 0.6fr 1fr 1fr 1.5fr 0.8fr 66px">
+      <span>Article</span><span>Size</span><span>Fabric</span><span>BOM</span><span>Price</span><span>SKUs</span><span>Print</span><span>Assigned</span><span>Status</span><span>Deadline</span><span>Illustration</span><span>Edit</span>
     </div>`+sub.map(r=>`
-    <div class="grow" style="grid-template-columns:2fr 0.7fr 0.8fr 0.7fr 0.7fr 0.7fr 0.7fr 1.2fr 1.1fr 0.9fr 70px">
+    <div class="grow" style="grid-template-columns:1.8fr 0.6fr 0.8fr 0.6fr 0.6fr 0.5fr 0.6fr 1fr 1fr 1.5fr 0.8fr 66px">
       <div class="gcell gcell-name">${r.product}${r.kids?'<span class="badge b-kids" style="margin-left:5px;font-size:9px">Kids</span>':''}${r.exclusive?'<span class="badge b-excl" style="margin-left:4px;font-size:9px">Excl</span>':''}</div>
       <div class="gcell">${r.size||'—'}</div>
       <div class="gcell" style="font-size:10px;color:var(--text2)">${r.fabric||'—'}</div>
-      <div class="gcell" style="font-size:11px">${r.bom||'TBD'}</div>
+      <div class="gcell" style="font-size:11px">${r.bom||'—'}</div>
       <div class="gcell">${r.price||'TBD'}</div>
       <div class="gcell">${r.sku||0}</div>
       <div class="gcell">${printBadge(r.print||0,r.plain||0)}</div>
       <div class="gcell">${assignSelect(r.id,r.assigned)}</div>
       <div class="gcell">${statusSelect(r.id,r.status)}</div>
+      <div class="gcell" style="font-size:10px;color:var(--text2)">${r.deadline||'—'}</div>
       <div class="gcell">${imgCell(r.id,r.img)}</div>
       <div class="gcell">${editBtn(r.id)}</div>
     </div>`).join('');
@@ -985,7 +991,7 @@ function renderGT(){
   popSel('gt-f-des',unique(s1.map(x=>x.assigned).filter(x=>x&&x!=='TBD')),fdes);
   const rows=ptypeFilter(s1.filter(r=>(!fdes||r.assigned===fdes)&&(!fst||r.status===fst)&&(!fs||r.product.toLowerCase().includes(fs))),fpt);
   $("gt-grid").innerHTML=rows.length?rows.map(r=>`
-    <div class="grow" style="grid-template-columns:2fr 1fr 0.8fr 0.6fr 0.7fr 0.7fr 1.2fr 1.1fr 0.9fr 70px">
+    <div class="grow" style="grid-template-columns:1.8fr 1fr 0.8fr 0.6fr 0.6fr 0.6fr 1fr 1fr 1.4fr 0.8fr 66px">
       <div class="gcell gcell-name">${r.product}</div>
       <div class="gcell" style="font-size:11px">${r.category}</div>
       <div class="gcell" style="font-size:10px;color:var(--text2)">${r.fabric||'TBD'}</div>
@@ -994,6 +1000,7 @@ function renderGT(){
       <div class="gcell">${printBadge(r.print||0,r.plain||0)}</div>
       <div class="gcell">${assignSelect(r.id,r.assigned)}</div>
       <div class="gcell">${statusSelect(r.id,r.status)}</div>
+      <div class="gcell" style="font-size:10px;color:var(--text2)">${r.deadline||'—'}</div>
       <div class="gcell">${imgCell(r.id,r.img)}</div>
       <div class="gcell">${editBtn(r.id)}</div>
     </div>`).join(''):empty();
@@ -1105,36 +1112,36 @@ if(configured){
 
 /* =================== SEED DATA (first-run only) =================== */
 const SEED_DMART = [
-  {range:'College Bag',product:'Hope',size:'18"',price:'₹299',sku:8,print:4,plain:4,fabric:'Checks PU',kids:false,exclusive:false,ideation:'Concept: Sports, Travel, Typography, Geometric for Boys & Unisex. Floral & Tropical for Girls.',themes:['Sports','Travel','Geometric','Floral'],desc:'4 printed (1 girl, 2 boys, 2 unisex), 4 plain',assigned:'Darshita',status:'Done'},
-  {range:'College Bag',product:'Moscow',size:'18"',price:'₹399',sku:12,print:6,plain:6,fabric:'Checks PU',kids:false,exclusive:false,ideation:'Concept: Abstract, Geometric & Typography for Boys & Unisex. Floral, Tropical & Abstract for Girls.',themes:['Abstract','Geometric','Typography','Floral'],desc:'6 printed (3 girls, 3 boys, 1 unisex), 6 plain',assigned:'Darshita',status:'Done'},
-  {range:'College Bag',product:'Flite',size:'19"',price:'₹499',sku:8,print:5,plain:3,fabric:'Checks PU',kids:false,exclusive:false,ideation:'Concept: Abstract, Geometric, Games & Sports for Boys & Unisex. Floral, Tropical, Beauty & Abstract for Girls.',themes:['Abstract','Geometric','Sports','Floral'],desc:'5 printed (2 boys & 3 girls) & 3 plain (Unisex)',assigned:'TBD',status:'To Do'},
-  {range:'College Bag',product:'Athens',size:'19"',price:'₹499',sku:12,print:8,plain:4,fabric:'Checks PU',kids:false,exclusive:true,ideation:'Concept: Surf & Skate, Typography, Adventure, Sports (Cricket, Football, Basketball, Hockey). Floral, Tropical, Beauty, Bow, Sports for Girls.',themes:['Sports','Typography','Travel','Floral'],desc:'4 Plain (Unisex) 8 Printed (3 girls & 4 boys, 1 unisex)',assigned:'Sayantani',status:'To Do'},
-  {range:'College Bag',product:'New York',size:'19"',price:'₹599',sku:12,print:6,plain:6,fabric:'Checks PU',kids:false,exclusive:true,ideation:'Concept: Space Explorer, Typography & Quotes, IPL Inspired, Formula Racing for Boys & Unisex. Floral, Tropical, Beauty, Sports & Travel for Girls.',themes:['Sports','Typography','Travel','Floral'],desc:'6 Plain (3 Unisex & 3 Boys) 6 Printed (3 girls & 3 unisex)',assigned:'Sayantani',status:'To Do'},
-  {range:'College Bag',product:'Floret',size:'19"',price:'₹699',sku:9,print:4,plain:4,fabric:'1000D PU',kids:false,exclusive:true,ideation:'Concept: FIFA World Cup, Typography, Adventure, Speed Racers, Music, Future Tech for Boys & Unisex. Floral, Tropical, Beauty, Fun & Sports for Girls.',themes:['Sports','Typography','Travel','Floral'],desc:'4 Plain (boys) 4 Printed (girls)',assigned:'Darshita',status:'To Do'},
-  {range:'College Bag',product:'Streamer',size:'19"',price:'₹899',sku:6,print:0,plain:6,fabric:'1001D PU',kids:false,exclusive:false,ideation:'Concept: Typography, Abstract, Geometric, Games & Sports for Boys & Unisex. Typography, Beauty, Girls Power & Abstract for Girls.',themes:['Typography','Abstract','Geometric','Sports'],desc:'6 plain (3 Girls & 3 unisex)',assigned:'Sayantani',status:'To Do'},
-  {range:'School Bag',product:'Oreo',size:'14"',price:'₹199',sku:12,print:12,plain:0,fabric:'3×3 PVC',kids:false,exclusive:false,ideation:'Themes: Candy, Robot, Cars, Construction, Fairy, Mermaid, Space, Dino, Jungle Safari, Castle, Unicorn.',themes:['Nature','Abstract','Geometric'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed',assigned:'Shriya',status:'Done'},
-  {range:'School Bag',product:'Cupcake',size:'16"',price:'₹249',sku:12,print:12,plain:0,fabric:'3×3 PVC',kids:false,exclusive:false,ideation:'Themes: Robot, Cars, Construction, Dino, Jungle Safari, Unicorn, Shark, Rainbow, Kitty.',themes:['Nature','Abstract'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed',assigned:'Shriya',status:'Done'},
-  {range:'School Bag',product:'Nano',size:'12"',price:'₹299',sku:12,print:12,plain:0,fabric:'PU KT Dobby',kids:true,exclusive:false,ideation:'Disney & Marvel: Lion King, Spiderman, Captain America, POOH, Stitch, Avengers, Frozen, Snow White, Rapunzel, Mickey, Princess.',themes:['Character'],desc:'5 Boys, 5 Girls, 2 Unisex — Disney & Marvel',assigned:'Rahul',status:'To Do'},
-  {range:'School Bag',product:'Dazzle',size:'14"',price:'₹449',sku:12,print:12,plain:0,fabric:'1000D PVC',kids:true,exclusive:false,ideation:'Character — Disney & Marvel: Avengers, Spider-Man, Captain America, Black Panther, Princess, Frozen, Rapunzel, Moana etc.',themes:['Character'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed, Character',assigned:'Shriya',status:'To Do'},
-  {range:'School Bag',product:'Mystique',size:'16"',price:'₹549',sku:12,print:12,plain:0,fabric:'PU Checks / 1000D PVC',kids:true,exclusive:false,ideation:'Character — Disney & Marvel: Avengers, Spider-Man, Captain America, Black Panther, Princess, Frozen, Rapunzel, Moana etc.',themes:['Character'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed, Character',assigned:'Rahul',status:'To Do'},
-  {range:'School Bag',product:'Minion',size:'15"',price:'₹499',sku:12,print:12,plain:0,fabric:'PU Checks / Bolt 170',kids:false,exclusive:false,ideation:'Theme: Space, Football, Fashion Accessories, Cars, Basketball, Skating, Camera, Dino, J.Safari, Mermaid, Controller etc.',themes:['Sports','Nature','Abstract'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed',assigned:'Shriya',status:'To Do'},
-  {range:'School Bag',product:'Mischief',size:'17"',price:'₹549',sku:12,print:12,plain:0,fabric:'PU Checks / Bolt 170',kids:false,exclusive:false,ideation:'Non-Character: Theme — Space, Football, Fashion Accessories, Cars, Basketball, Skating, Camera, Dino, J.Safari, Mermaid, Controller (4 AOP & 8 printed).',themes:['Sports','Nature','Abstract'],desc:'5 Boys, 5 Girls, 2 Unisex — 4 AOP & 8 printed',assigned:'Rahul',status:'To Do'},
-  {range:'School Bag',product:'Funky',size:'16"',price:'₹599',sku:12,print:12,plain:0,fabric:'Twill PVC / Foam',kids:false,exclusive:false,ideation:'Theme: Space, Dino, Candy, Mermaid, Skate, Controller, Butterfly, Fashion Accessories, Music, Car, Girl Power.',themes:['Nature','Abstract','Sports'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed',assigned:'Shriya',status:'To Do'},
-  {range:'School Bag',product:'Nugget',size:'16"',price:'₹699',sku:6,print:6,plain:0,fabric:'1000D / Alpha Stamping / KT Dobby',kids:false,exclusive:true,ideation:'Theme: Space, Science Experiment, Geek, Game Style, Candy, Sea-Shark, Unicorn.',themes:['Abstract','Nature'],desc:'2 Boys, 3 Girls, 1 Unisex',assigned:'Rahul',status:'Done'},
-  {range:'School Bag',product:'Snappy',size:'16"',price:'₹699',sku:4,print:4,plain:0,fabric:'Bolt PVC AOP',kids:false,exclusive:false,ideation:'Themes: Car, Basketball, Controller, Cricket & Floral.',themes:['Sports','Floral'],desc:'2 Boys, 2 Girls, 1 Unisex',assigned:'Rahul',status:'To Do'},
-  {range:'School Bag',product:'Aristro',size:'18"',price:'₹799',sku:6,print:6,plain:0,fabric:'PVC Leather / Bolt',kids:true,exclusive:false,ideation:'Character — Marvel & Disney.',themes:['Character'],desc:'3 Boys, 3 Girls — Character MARVEL & DISNEY',assigned:'Shriya',status:'To Do'},
-  {range:'School Bag',product:'Stunner',size:'18"',price:'₹799',sku:6,print:6,plain:0,fabric:'Checks PU',kids:true,exclusive:false,ideation:'Character — Marvel & Disney.',themes:['Character'],desc:'3 Boys, 3 Girls — Character MARVEL & DISNEY',assigned:'Rahul',status:'To Do'},
-  {range:'School Bag',product:'Perry (Printed)',size:'18"',price:'₹599',sku:8,print:8,plain:0,fabric:'1000D PVC / Bolt PU',kids:false,exclusive:false,ideation:'Non-Character: Themes — Basketball, Beach, Coffee, Skating, Pickleball, Cycling, Bike, Cars.',themes:['Sports','Travel','Abstract'],desc:'4 Boys & 4 Girls — Non Character',assigned:'Shriya',status:'To Do'},
-  {range:'Laptop Bag',product:'Hot',size:'—',price:'₹549',sku:6,print:0,plain:6,fabric:'5×5 PVC',kids:false,exclusive:false,ideation:'Minimal designs & Highlights (pop-up).',themes:['Abstract','Geometric'],desc:'Plain',assigned:'Darshita',status:'To Do'},
-  {range:'Laptop Bag',product:'Hero',size:'—',price:'₹599',sku:6,print:0,plain:6,fabric:'5×5 PVC',kids:false,exclusive:false,ideation:'Minimal designs & Highlights (pop-up). Fabric play (Embossed).',themes:['Abstract','Geometric'],desc:'Plain',assigned:'Sayantani',status:'To Do'},
-  {range:'Laptop Bag',product:'Hunt',size:'—',price:'₹699',sku:4,print:0,plain:4,fabric:'5×5 PVC',kids:false,exclusive:false,ideation:'Minimal designs & Highlights (pop-up). Fabric play (Embossed).',themes:['Abstract','Geometric'],desc:'Plain',assigned:'Sayantani',status:'To Do'},
-  {range:'Laptop Bag',product:'Perry',size:'—',price:'TBD',sku:4,print:0,plain:4,fabric:'5×5 PVC',kids:false,exclusive:false,ideation:'Minimal designs & Highlights (pop-up) & Fabric play.',themes:['Abstract'],desc:'Plain',assigned:'Sayantani',status:'To Do'},
-  {range:'Additional',product:'DF/Wheeler',size:'—',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do'},
-  {range:'Additional',product:'Shopping Bag',size:'—',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do'},
-  {range:'Additional',product:'Pouch',size:'—',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do'},
-  {range:'Additional',product:'Laptop Premium Range',size:'—',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do'},
-  {range:'Additional',product:'Lunch Bag',size:'—',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do'},
-  {range:'Additional',product:'Gym Bag',size:'—',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do'},
+  {range:'College Bag',product:'Hope',size:'18"',bom:'125',price:'₹299',sku:8,print:4,plain:4,fabric:'Checks PU',kids:false,exclusive:false,ideation:'Concept: Sports, Travel, Typography, Geometric for Boys & Unisex. Floral & Tropical for Girls.',themes:['Sports','Travel','Geometric','Floral'],desc:'4 printed (1 girl, 2 boys, 2 unisex), 4 plain',assigned:'Darshita',status:'Done',deadline:'Completed'},
+  {range:'College Bag',product:'Moscow',size:'18"',bom:'155',price:'₹399',sku:12,print:6,plain:6,fabric:'Checks PU',kids:false,exclusive:false,ideation:'Concept: Abstract, Geometric & Typography for Boys & Unisex. Floral, Tropical & Abstract for Girls.',themes:['Abstract','Geometric','Typography','Floral'],desc:'6 printed (3 girls, 3 boys, 1 unisex), 6 plain',assigned:'Darshita',status:'Done',deadline:'Completed'},
+  {range:'College Bag',product:'Flite',size:'19"',bom:'',price:'₹499',sku:8,print:5,plain:3,fabric:'Checks PU',kids:false,exclusive:false,ideation:'Concept: Abstract, Geometric, Games & Sports for Boys & Unisex. Floral, Tropical, Beauty & Abstract for Girls.',themes:['Abstract','Geometric','Sports','Floral'],desc:'5 printed (2 boys & 3 girls) & 3 plain (Unisex)',assigned:'Amrita',status:'To Do',deadline:''},
+  {range:'College Bag',product:'Athens',size:'19"',bom:'185',price:'₹499',sku:12,print:8,plain:4,fabric:'Checks PU',kids:false,exclusive:true,ideation:'Concept: Surf & Skate, Typography, Adventure, Sports (Cricket, Football, Basketball, Hockey). Floral, Tropical, Beauty, Bow, Sports for Girls.',themes:['Sports','Typography','Travel','Floral'],desc:'4 Plain (Unisex) 8 Printed (3 girls & 4 boys, 1 unisex)',assigned:'Darshita',status:'To Do',deadline:'08-07-2026 — With Techpack & Print file'},
+  {range:'College Bag',product:'New York',size:'19"',bom:'230',price:'₹599',sku:12,print:6,plain:6,fabric:'Checks PU',kids:false,exclusive:true,ideation:'Concept: Space Explorer, Typography & Quotes, IPL Inspired, Formula Racing for Boys & Unisex. Floral, Tropical, Beauty, Sports & Travel for Girls.',themes:['Sports','Typography','Travel','Floral'],desc:'6 Plain (3 Unisex & 3 Boys) 6 Printed (3 girls & 3 unisex)',assigned:'Sayantani',status:'To Do',deadline:'07-07-2026 — With Techpack & Print file'},
+  {range:'College Bag',product:'Floret',size:'19"',bom:'350',price:'₹699',sku:9,print:4,plain:4,fabric:'1000D PU',kids:false,exclusive:true,ideation:'Concept: FIFA World Cup, Typography, Adventure, Speed Racers, Music, Future Tech for Boys & Unisex. Floral, Tropical, Beauty, Fun & Sports for Girls.',themes:['Sports','Typography','Travel','Floral'],desc:'4 Plain (boys) 4 Printed (girls)',assigned:'Darshita',status:'To Do',deadline:'14-07-2026 — Designing'},
+  {range:'College Bag',product:'Streamer',size:'19"',bom:'',price:'₹899',sku:6,print:0,plain:6,fabric:'1001D PU',kids:false,exclusive:false,ideation:'Concept: Typography, Abstract, Geometric, Games & Sports for Boys & Unisex. Typography, Beauty, Girls Power & Abstract for Girls.',themes:['Typography','Abstract','Geometric','Sports'],desc:'6 plain (3 Girls & 3 unisex)',assigned:'Sayantani',status:'To Do',deadline:'23-07-2026 — With Techpack & Print file'},
+  {range:'School Bag',product:'Oreo',size:'14"',bom:'85',price:'₹199',sku:12,print:12,plain:0,fabric:'3×3 PVC',kids:false,exclusive:false,ideation:'Themes: Candy, Robot, Cars, Construction, Fairy, Mermaid, Space, Dino, Jungle Safari, Castle, Unicorn.',themes:['Nature','Abstract','Geometric'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed',assigned:'Shriya',status:'Done',deadline:'Completed'},
+  {range:'School Bag',product:'Cupcake',size:'16"',bom:'100',price:'₹249',sku:12,print:12,plain:0,fabric:'3×3 PVC',kids:false,exclusive:false,ideation:'Themes: Robot, Cars, Construction, Dino, Jungle Safari, Unicorn, Shark, Rainbow, Kitty.',themes:['Nature','Abstract'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed',assigned:'Shriya',status:'Done',deadline:'Completed'},
+  {range:'School Bag',product:'Nano',size:'12"',bom:'168',price:'₹299',sku:12,print:12,plain:0,fabric:'PU KT Dobby',kids:true,exclusive:false,ideation:'Disney & Marvel: Lion King, Spiderman, Captain America, POOH, Stitch, Avengers, Frozen, Snow White, Rapunzel, Mickey, Princess.',themes:['Character'],desc:'5 Boys, 5 Girls, 2 Unisex — Disney & Marvel',assigned:'Rahul',status:'Done',deadline:'Completed'},
+  {range:'School Bag',product:'Dazzle',size:'14"',bom:'250',price:'₹449',sku:12,print:12,plain:0,fabric:'1000D PVC',kids:true,exclusive:false,ideation:'Character — Disney & Marvel: Avengers, Spider-Man, Captain America, Black Panther, Princess, Frozen, Rapunzel, Moana etc.',themes:['Character'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed, Character',assigned:'Shriya',status:'To Do',deadline:'06-07 to 10-07-2026 — Print & Techpack'},
+  {range:'School Bag',product:'Mystique',size:'16"',bom:'310',price:'₹549',sku:12,print:12,plain:0,fabric:'PU Checks / 1000D PVC',kids:true,exclusive:false,ideation:'Character — Disney & Marvel: Avengers, Spider-Man, Captain America, Black Panther, Princess, Frozen, Rapunzel, Moana etc.',themes:['Character'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed, Character',assigned:'Rahul',status:'To Do',deadline:'15-07-2026 — With Print & Techpack'},
+  {range:'School Bag',product:'Minion',size:'15"',bom:'235',price:'₹499',sku:12,print:12,plain:0,fabric:'PU Checks / Bolt 170',kids:false,exclusive:false,ideation:'Theme: Space, Football, Fashion Accessories, Cars, Basketball, Skating, Camera, Dino, J.Safari, Mermaid, Controller etc.',themes:['Sports','Nature','Abstract'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed',assigned:'Shriya',status:'To Do',deadline:'13-07 to 18-07-2026 — Print & Techpack'},
+  {range:'School Bag',product:'Mischief',size:'17"',bom:'295',price:'₹549',sku:12,print:12,plain:0,fabric:'PU Checks / Bolt 170',kids:false,exclusive:false,ideation:'Non-Character: Theme — Space, Football, Fashion Accessories, Cars, Basketball, Skating, Camera, Dino, J.Safari, Mermaid, Controller (4 AOP & 8 printed).',themes:['Sports','Nature','Abstract'],desc:'5 Boys, 5 Girls, 2 Unisex — 4 AOP & 8 printed',assigned:'Rahul',status:'To Do',deadline:'07-07-2026 — With Print & Techpack'},
+  {range:'School Bag',product:'Funky',size:'16"',bom:'',price:'₹599',sku:12,print:12,plain:0,fabric:'Twill PVC / Foam',kids:false,exclusive:false,ideation:'Theme: Space, Dino, Candy, Mermaid, Skate, Controller, Butterfly, Fashion Accessories, Music, Car, Girl Power.',themes:['Nature','Abstract','Sports'],desc:'5 Boys, 5 Girls, 2 Unisex — All printed',assigned:'Shriya',status:'To Do',deadline:'20-07 to 27-07-2026 — Print & Techpack'},
+  {range:'School Bag',product:'Nugget',size:'16"',bom:'380',price:'₹699',sku:6,print:6,plain:0,fabric:'1000D / Alpha Stamping / KT Dobby',kids:false,exclusive:true,ideation:'Theme: Space, Science Experiment, Geek, Game Style, Candy, Sea-Shark, Unicorn.',themes:['Abstract','Nature'],desc:'2 Boys, 3 Girls, 1 Unisex',assigned:'Rahul',status:'Done',deadline:'Completed'},
+  {range:'School Bag',product:'Snappy',size:'16"',bom:'',price:'₹699',sku:4,print:4,plain:0,fabric:'Bolt PVC AOP',kids:false,exclusive:false,ideation:'Themes: Car, Basketball, Controller, Cricket & Floral.',themes:['Sports','Floral'],desc:'2 Boys, 2 Girls, 1 Unisex',assigned:'Rahul',status:'Done',deadline:'Completed'},
+  {range:'School Bag',product:'Aristro',size:'18"',bom:'430',price:'₹799',sku:6,print:6,plain:0,fabric:'PVC Leather / Bolt',kids:true,exclusive:false,ideation:'Character — Marvel & Disney.',themes:['Character'],desc:'3 Boys, 3 Girls — Character MARVEL & DISNEY',assigned:'Shriya',status:'To Do',deadline:'28-07 to 31-07-2026 — Print & Techpack'},
+  {range:'School Bag',product:'Stunner',size:'18"',bom:'',price:'₹799',sku:6,print:6,plain:0,fabric:'Checks PU',kids:true,exclusive:false,ideation:'Character — Marvel & Disney.',themes:['Character'],desc:'3 Boys, 3 Girls — Character MARVEL & DISNEY',assigned:'Rahul',status:'To Do',deadline:'20-07-2026 — With Print & Techpack'},
+  {range:'School Bag',product:'Perry (Printed)',size:'18"',bom:'355',price:'₹599',sku:8,print:8,plain:0,fabric:'1000D PVC / Bolt PU',kids:false,exclusive:false,ideation:'Non-Character: Themes — Basketball, Beach, Coffee, Skating, Pickleball, Cycling, Bike, Cars.',themes:['Sports','Travel','Abstract'],desc:'4 Boys & 4 Girls — Non Character',assigned:'Shriya',status:'To Do',deadline:'28-07-2026 — With Print & Techpack'},
+  {range:'Laptop Bag',product:'Hot',size:'—',bom:'',price:'₹549',sku:6,print:0,plain:6,fabric:'5×5 PVC',kids:false,exclusive:false,ideation:'Minimal designs & Highlights (pop-up).',themes:['Abstract','Geometric'],desc:'Plain',assigned:'TBD',status:'To Do',deadline:''},
+  {range:'Laptop Bag',product:'Hero',size:'—',bom:'',price:'₹599',sku:6,print:0,plain:6,fabric:'5×5 PVC',kids:false,exclusive:false,ideation:'Minimal designs & Highlights (pop-up). Fabric play (Embossed).',themes:['Abstract','Geometric'],desc:'Plain',assigned:'TBD',status:'To Do',deadline:''},
+  {range:'Laptop Bag',product:'Hunt',size:'—',bom:'',price:'₹699',sku:4,print:0,plain:4,fabric:'5×5 PVC',kids:false,exclusive:false,ideation:'Minimal designs & Highlights (pop-up). Fabric play (Embossed).',themes:['Abstract','Geometric'],desc:'Plain',assigned:'Amrita',status:'To Do',deadline:''},
+  {range:'Laptop Bag',product:'Perry',size:'—',bom:'',price:'TBD',sku:4,print:0,plain:4,fabric:'5×5 PVC',kids:false,exclusive:false,ideation:'Minimal designs & Highlights (pop-up) & Fabric play.',themes:['Abstract'],desc:'Plain',assigned:'TBD',status:'To Do',deadline:''},
+  {range:'Additional',product:'DF/Wheeler',size:'—',bom:'',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do',deadline:''},
+  {range:'Additional',product:'Shopping Bag',size:'—',bom:'',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do',deadline:''},
+  {range:'Additional',product:'Pouch',size:'—',bom:'',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do',deadline:''},
+  {range:'Additional',product:'Laptop Premium Range',size:'—',bom:'',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do',deadline:''},
+  {range:'Additional',product:'Lunch Bag',size:'—',bom:'',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do',deadline:''},
+  {range:'Additional',product:'Gym Bag',size:'—',bom:'',price:'TBD',sku:0,print:0,plain:0,fabric:'TBD',kids:false,exclusive:false,ideation:'TBD',themes:[],desc:'TBD',assigned:'TBD',status:'To Do',deadline:''},
 ];
 const SEED_RELIANCE = [
   {product:'Miniature',sno:12,price:'₹299',sku:4,assigned:'Rahul',status:'To Do'},
@@ -1154,36 +1161,52 @@ const SEED_VMM = [
 ];
 const SEED_GT = [
   {category:'College Bag',product:'Scott',sno:1,price:'₹135',sku:10,print:5,plain:5,fabric:'450×450 PVC & 3×3 PVC',ideation:'Floral, Tropical, Abstract, Geometric, Fun, Girls Power, Travel & Beauty for Girls. Sports, Geometric & Abstract for Boys.',themes:['Floral','Sports','Geometric','Travel'],assigned:'Agartava',status:'To Do'},
-  {category:'College Bag',product:'Dynamic',sno:2,price:'₹225',sku:6,print:3,plain:3,fabric:'Satin Twill PU',ideation:'Geometric, Abstract & Sport for Plain. Floral, Tropical for Girls & Sports, Geometric for Unisex.',themes:['Geometric','Abstract','Sports','Floral'],assigned:'Darshita',status:'To Do'},
-  {category:'College Bag',product:'Glorious',sno:3,price:'₹355',sku:5,print:3,plain:2,fabric:'Retro Dobby PU',ideation:'Biker, Sports, Geometric, Adventure, Games. Floral, Nature Lover, Girls Power & Bloom & Shine & Tropical.',themes:['Sports','Geometric','Floral','Nature'],assigned:'Darshita',status:'To Do'},
-  {category:'College Bag',product:'Inox',sno:4,price:'₹375',sku:5,print:3,plain:2,fabric:'Retro Dobby PU',ideation:'Sports (Cricket, Football, Basketball & Cycling), Geometric, Adventure, Speed Racers. Floral, Tropical, Beauty, Fun & Travel for Girls.',themes:['Sports','Geometric','Floral','Travel'],assigned:'Sayantani',status:'To Do'},
-  {category:'College Bag',product:'Incredible',sno:5,price:'₹415',sku:5,print:3,plain:2,fabric:'Retro Dobby PU',ideation:'FIFA World Cup, Typography, Adventure, Speed Racers, Music, Future Tech for Boys & Unisex. Floral, Tropical, Beauty, Fun & Sports for Girls.',themes:['Sports','Typography','Floral'],assigned:'Darshita',status:'To Do'},
-  {category:'College Bag',product:'Fabulous',sno:6,price:'₹440',sku:5,print:3,plain:2,fabric:'1000D PU',ideation:'Surf & Skate, Typography, Adventure, Sports (Cricket, Football, Basketball, Hockey). Floral, Tropical, Beauty, Bow, Sports for Girls.',themes:['Sports','Typography','Floral','Travel'],assigned:'Darshita',status:'To Do'},
-  {category:'College Bag',product:'Fame',sno:7,price:'₹550',sku:5,print:3,plain:2,fabric:'1000D PU',ideation:'Space Explorer, Typography & Quotes, IPL Inspired, Football Goal, Formula Racing for Boys & Unisex. Floral, Tropical, Beauty & Sports for Girls.',themes:['Sports','Typography','Travel','Floral'],assigned:'Darshita',status:'To Do'},
-  {category:'College Bag',product:'Blockbuster',sno:8,price:'₹560',sku:5,print:3,plain:2,fabric:'1000D PU',ideation:'Sports (Olympic, Polo, Golf, Baseball & Tennis), Typography, Adventure, Surfing & Skating. Floral, Tropical, Beauty & Sports for Girls.',themes:['Sports','Typography','Floral'],assigned:'Sayantani',status:'To Do'},
-  {category:'College Bag',product:'Century',sno:9,price:'₹600',sku:5,print:0,plain:5,fabric:'Reversible Checks PU',ideation:'Typography, Adventure, Sports (Cricket, IPL, Football, Formula Racing), Surf & Skate, Future Tech & Gaming for Boys & Unisex.',themes:['Sports','Typography','Geometric'],assigned:'Sayantani',status:'To Do'},
-  {category:'College Bag',product:'Iconic',sno:10,price:'₹675',sku:5,print:2,plain:3,fabric:'CK Twill',ideation:'Typography, Adventure, Sports (Cricket, IPL, Formula Racing), Surf & Skate, Future Tech & Gaming. Floral, Tropical, Beauty & Sports for Girls.',themes:['Sports','Typography','Floral'],assigned:'Sayantani',status:'To Do'},
-  {category:'College Bag',product:'Dreamer',sno:11,price:'₹725',sku:5,print:0,plain:5,fabric:'CK Twill',ideation:'Typography, Adventure, Sports, Surf & Skate, Future Tech & Gaming, Doodle, Beauty, Tropical & Travel.',themes:['Sports','Typography','Travel','Floral'],assigned:'Sayantani',status:'To Do'},
-  {category:'College Bag',product:'Champion',sno:12,price:'₹775',sku:5,print:0,plain:5,fabric:'CK Twill',ideation:'Sports (Olympic, Polo, Golf, Baseball & Tennis), Typography, Adventure, Games, Surfing & Skating for Boys & Unisex.',themes:['Sports','Typography'],assigned:'Darshita',status:'To Do'},
+  {category:'College Bag',product:'Dynamic',sno:2,price:'₹225',sku:6,print:3,plain:3,fabric:'Satin Twill PU',ideation:'Geometric, Abstract & Sport for Plain. Floral, Tropical for Girls & Sports, Geometric for Unisex.',themes:['Geometric','Abstract','Sports','Floral'],assigned:'Darshita',status:'To Do',deadline:'17-07-2026 — With Print & Techpack'},
+  {category:'College Bag',product:'Glorious',sno:3,price:'₹355',sku:5,print:3,plain:2,fabric:'Retro Dobby PU',ideation:'Biker, Sports, Geometric, Adventure, Games. Floral, Nature Lover, Girls Power & Bloom & Shine & Tropical.',themes:['Sports','Geometric','Floral','Nature'],assigned:'Darshita',status:'To Do',deadline:'22-07-2026 — With Print & Techpack'},
+  {category:'College Bag',product:'Inox',sno:4,price:'₹375',sku:5,print:3,plain:2,fabric:'Retro Dobby PU',ideation:'Sports (Cricket, Football, Basketball & Cycling), Geometric, Adventure, Speed Racers. Floral, Tropical, Beauty, Fun & Travel for Girls.',themes:['Sports','Geometric','Floral','Travel'],assigned:'Sayantani',status:'To Do',deadline:'29-07-2026 — Print & Techpack'},
+  {category:'College Bag',product:'Incredible',sno:5,price:'₹415',sku:5,print:3,plain:2,fabric:'Retro Dobby PU',ideation:'FIFA World Cup, Typography, Adventure, Speed Racers, Music, Future Tech for Boys & Unisex. Floral, Tropical, Beauty, Fun & Sports for Girls.',themes:['Sports','Typography','Floral'],assigned:'Darshita',status:'To Do',deadline:'29-07-2026 — Print & Techpack'},
+  {category:'College Bag',product:'Fabulous',sno:6,price:'₹440',sku:5,print:3,plain:2,fabric:'1000D PU',ideation:'Surf & Skate, Typography, Adventure, Sports (Cricket, Football, Basketball, Hockey). Floral, Tropical, Beauty, Bow, Sports for Girls.',themes:['Sports','Typography','Floral','Travel'],assigned:'Darshita',status:'To Do',deadline:'03-08-2026 — Print & Techpack'},
+  {category:'College Bag',product:'Fame',sno:7,price:'₹550',sku:5,print:3,plain:2,fabric:'1000D PU',ideation:'Space Explorer, Typography & Quotes, IPL Inspired, Football Goal, Formula Racing for Boys & Unisex. Floral, Tropical, Beauty & Sports for Girls.',themes:['Sports','Typography','Travel','Floral'],assigned:'Darshita',status:'To Do',deadline:'07-08-2026 — Print & Techpack'},
+  {category:'College Bag',product:'Blockbuster',sno:8,price:'₹560',sku:5,print:3,plain:2,fabric:'1000D PU',ideation:'Sports (Olympic, Polo, Golf, Baseball & Tennis), Typography, Adventure, Surfing & Skating. Floral, Tropical, Beauty & Sports for Girls.',themes:['Sports','Typography','Floral'],assigned:'Sayantani',status:'To Do',deadline:'03-08-2026 — With Print & Techpack'},
+  {category:'College Bag',product:'Century',sno:9,price:'₹600',sku:5,print:0,plain:5,fabric:'Reversible Checks PU',ideation:'Typography, Adventure, Sports (Cricket, IPL, Football, Formula Racing), Surf & Skate, Future Tech & Gaming for Boys & Unisex.',themes:['Sports','Typography','Geometric'],assigned:'Sayantani',status:'To Do',deadline:'07-08-2026 — Print & Techpack'},
+  {category:'College Bag',product:'Iconic',sno:10,price:'₹675',sku:5,print:2,plain:3,fabric:'CK Twill',ideation:'Typography, Adventure, Sports (Cricket, IPL, Formula Racing), Surf & Skate, Future Tech & Gaming. Floral, Tropical, Beauty & Sports for Girls.',themes:['Sports','Typography','Floral'],assigned:'Sayantani',status:'To Do',deadline:'12-08-2026 — Print & Techpack'},
+  {category:'College Bag',product:'Dreamer',sno:11,price:'₹725',sku:5,print:0,plain:5,fabric:'CK Twill',ideation:'Typography, Adventure, Sports, Surf & Skate, Future Tech & Gaming, Doodle, Beauty, Tropical & Travel.',themes:['Sports','Typography','Travel','Floral'],assigned:'Amrita',status:'To Do',deadline:'16-08-2026'},
+  {category:'College Bag',product:'Champion',sno:12,price:'₹775',sku:5,print:0,plain:5,fabric:'CK Twill',ideation:'Sports (Olympic, Polo, Golf, Baseball & Tennis), Typography, Adventure, Games, Surfing & Skating for Boys & Unisex.',themes:['Sports','Typography'],assigned:'Amrita',status:'To Do',deadline:'23-08-2026'},
   {category:'College Bag',product:'Flite',sno:13,price:'TBD',sku:8,print:5,plain:3,fabric:'Satin Twill PU',ideation:'Abstract, Geometric, Games & Sports for Boys & Unisex. Floral, Tropical, Beauty & Abstract for Girls.',themes:['Abstract','Geometric','Sports','Floral'],assigned:'Agartava',status:'To Do'},
   {category:'College Bag',product:'Infinity',sno:14,price:'TBD',sku:5,print:5,plain:0,fabric:'CK Twill',ideation:'Sports (Olympic, Polo, Golf, Baseball & Tennis), Typography, Adventure, Games, Surfing & Skating.',themes:['Sports','Typography'],assigned:'Rahul',status:'To Do'},
-  {category:'College Bag',product:'King',sno:15,price:'TBD',sku:2,print:0,plain:2,fabric:'Retro Dobby PU',ideation:'Games, Sports (Olympic, Polo, Golf, Baseball & Tennis), Typography, Adventure, Surfing & Skating.',themes:['Sports','Typography'],assigned:'Sayantani',status:'To Do'},
-  {category:'College Bag',product:'Stellar',sno:16,price:'TBD',sku:6,print:0,plain:6,fabric:'CK Twill',ideation:'Sports (Olympic, Polo, Golf, Baseball & Tennis), Typography, Adventure, Games, Surfing & Skating. Typography, Quotes, Music, Girls Power & Sports for Girls.',themes:['Sports','Typography','Floral'],assigned:'Sayantani',status:'To Do'},
+  {category:'College Bag',product:'King',sno:15,price:'TBD',sku:2,print:0,plain:2,fabric:'Retro Dobby PU',ideation:'Games, Sports (Olympic, Polo, Golf, Baseball & Tennis), Typography, Adventure, Surfing & Skating.',themes:['Sports','Typography'],assigned:'Sayantani',status:'To Do',deadline:'14-08-2026 — Print & Techpack'},
+  {category:'College Bag',product:'Stellar',sno:16,price:'TBD',sku:6,print:0,plain:6,fabric:'CK Twill',ideation:'Sports (Olympic, Polo, Golf, Baseball & Tennis), Typography, Adventure, Games, Surfing & Skating. Typography, Quotes, Music, Girls Power & Sports for Girls.',themes:['Sports','Typography','Floral'],assigned:'TBD',status:'To Do'},
   {category:'Laptop Bag',product:'Axis',sno:17,price:'₹375',sku:4,print:0,plain:4,fabric:'TBD',ideation:'Professional, Minimal, Structured.',themes:['Abstract'],assigned:'Sayantani',status:'To Do'},
   {category:'Laptop Bag',product:'Protech',sno:18,price:'₹400',sku:4,print:0,plain:4,fabric:'TBD',ideation:'Professional, Minimal.',themes:['Abstract'],assigned:'Darshita',status:'To Do'},
   {category:'Laptop Bag',product:'Atlas',sno:19,price:'₹415',sku:4,print:0,plain:4,fabric:'TBD',ideation:'Professional, Minimal.',themes:['Abstract'],assigned:'Darshita',status:'To Do'},
-  {category:'Laptop Bag',product:'Node',sno:20,price:'₹450',sku:5,print:0,plain:5,fabric:'TBD',ideation:'Professional, Minimal.',themes:['Abstract'],assigned:'Sayantani',status:'To Do'},
+  {category:'Laptop Bag',product:'Node',sno:20,price:'₹450',sku:5,print:0,plain:5,fabric:'TBD',ideation:'Professional, Minimal.',themes:['Abstract'],assigned:'Agartava',status:'To Do'},
   {category:'Laptop Bag',product:'Matrix',sno:21,price:'₹550',sku:4,print:0,plain:4,fabric:'TBD',ideation:'Professional, Minimal.',themes:['Abstract'],assigned:'Sayantani',status:'To Do'},
   {category:'Laptop Bag',product:'Xtreme',sno:22,price:'₹550',sku:4,print:0,plain:4,fabric:'TBD',ideation:'Professional, Minimal.',themes:['Abstract'],assigned:'Amrita',status:'To Do'},
   {category:'Laptop Bag',product:'Electra',sno:23,price:'₹600',sku:4,print:0,plain:4,fabric:'TBD',ideation:'Professional, Minimal.',themes:['Abstract'],assigned:'Amrita',status:'To Do'},
   {category:'Laptop Bag',product:'Zipster',sno:24,price:'₹650',sku:4,print:0,plain:4,fabric:'TBD',ideation:'Professional, Minimal.',themes:['Abstract'],assigned:'Amrita',status:'To Do'},
-  {category:'Laptop Bag',product:'Oxford',sno:25,price:'₹700',sku:4,print:0,plain:4,fabric:'TBD',ideation:'Professional, Minimal.',themes:['Abstract'],assigned:'Sayantani',status:'To Do'},
-  {category:'Hiking',product:'Trekker',sno:26,price:'TBD',sku:1,print:0,plain:1,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Sayantani',status:'To Do'},
-  {category:'Hiking',product:'Fortuner',sno:27,price:'TBD',sku:1,print:0,plain:1,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Darshita',status:'To Do'},
-  {category:'Hiking',product:'Hangover',sno:28,price:'TBD',sku:3,print:0,plain:3,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Sayantani',status:'To Do'},
-  {category:'Hiking',product:'Commando',sno:29,price:'TBD',sku:1,print:0,plain:1,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Darshita',status:'To Do'},
-  {category:'Hiking',product:'Mount',sno:30,price:'TBD',sku:1,print:0,plain:1,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Darshita',status:'To Do'},
-  {category:'Hiking',product:'Camp',sno:31,price:'TBD',sku:1,print:0,plain:1,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Darshita',status:'To Do'},
+  {category:'Laptop Bag',product:'Oxford',sno:25,price:'₹700',sku:4,print:0,plain:4,fabric:'TBD',ideation:'Professional, Minimal.',themes:['Abstract'],assigned:'Amrita',status:'To Do'},
+  {category:'Hiking',product:'Trekker',sno:26,price:'₹109',sku:1,print:0,plain:1,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Amrita',status:'To Do'},
+  {category:'Hiking',product:'Fortuner',sno:27,price:'₹109',sku:1,print:0,plain:1,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Amrita',status:'To Do'},
+  {category:'Hiking',product:'Hangover',sno:28,price:'₹109',sku:3,print:0,plain:3,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Amrita',status:'To Do'},
+  {category:'Hiking',product:'Commando',sno:29,price:'₹109',sku:1,print:0,plain:1,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Amrita',status:'To Do'},
+  {category:'Hiking',product:'Mount',sno:30,price:'₹109',sku:1,print:0,plain:1,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Amrita',status:'To Do'},
+  {category:'Hiking',product:'Camp',sno:31,price:'₹109',sku:1,print:0,plain:1,fabric:'TBD',ideation:'Outdoor, Nature, Adventure.',themes:['Nature','Travel'],assigned:'Amrita',status:'To Do'},
+  {category:'School Backpack',product:'Zolo',sno:1,price:'TBD',sku:4,print:4,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Rahul',status:'To Do',deadline:'01-08 to 05-08-2026'},
+  {category:'School Backpack',product:'Fluffy',sno:2,price:'TBD',sku:4,print:4,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Shriya',status:'To Do',deadline:'01-08 to 05-08-2026'},
+  {category:'School Backpack',product:'Fuzzy',sno:3,price:'TBD',sku:4,print:4,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Shriya',status:'To Do',deadline:'01-08 to 05-08-2026'},
+  {category:'School Backpack',product:'Smiley',sno:4,price:'TBD',sku:6,print:6,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Shriya',status:'To Do',deadline:'06-08 to 11-08-2026'},
+  {category:'School Backpack',product:'Skippy',sno:5,price:'TBD',sku:6,print:6,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Rahul',status:'To Do',deadline:'17-08 to 20-08-2026'},
+  {category:'School Backpack',product:'Funky',sno:6,price:'TBD',sku:8,print:8,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Rahul',status:'To Do',deadline:'12-08 to 15-08-2026'},
+  {category:'School Backpack',product:'Tipsy',sno:7,price:'TBD',sku:8,print:8,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Shriya',status:'To Do',deadline:'12-08 to 15-08-2026'},
+  {category:'School Backpack',product:'Snappy',sno:8,price:'TBD',sku:8,print:8,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Rahul',status:'To Do',deadline:'06-08 to 11-08-2026'},
+  {category:'School Backpack',product:'Power',sno:9,price:'TBD',sku:6,print:6,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Shriya',status:'To Do',deadline:'17-08 to 20-08-2026'},
+  {category:'School Backpack',product:'Ranger',sno:10,price:'TBD',sku:6,print:6,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Rahul',status:'To Do',deadline:'21-08 to 26-08-2026'},
+  {category:'School Backpack',product:'Nugget',sno:11,price:'TBD',sku:4,print:4,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Rahul',status:'To Do',deadline:'01-08 to 05-08-2026'},
+  {category:'School Backpack',product:'Fuse',sno:12,price:'TBD',sku:6,print:6,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Rahul',status:'To Do',deadline:'27-08 to 31-08-2026'},
+  {category:'School Backpack',product:'Infinity',sno:13,price:'TBD',sku:4,print:4,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Rahul',status:'To Do',deadline:'29-07 to 31-07-2026'},
+  {category:'School Backpack',product:'Minimind',sno:14,price:'TBD',sku:6,print:6,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Shriya',status:'To Do',deadline:'21-08 to 26-08-2026'},
+  {category:'School Backpack',product:'Strolley',sno:15,price:'TBD',sku:4,print:4,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Shriya',status:'To Do',deadline:'21-08 to 26-08-2026'},
+  {category:'School Backpack',product:'Combo',sno:16,price:'TBD',sku:4,print:4,plain:0,fabric:'',ideation:'',themes:[],desc:'Non-Character',assigned:'Shriya',status:'To Do',deadline:'27-08 to 31-08-2026'},
 ];
 const SEED_ECOM_MP = [
   {product:'Victoria',price:'₹140',sku:5,assigned:'Darshita',status:'To Do'},
